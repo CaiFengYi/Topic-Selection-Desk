@@ -1,6 +1,6 @@
-# 选题台：ticket01 本地原型
+# 选题台：ticket01–02 本地原型
 
-只实现「模拟榜单 / 手动输入 → 模拟研究 → 背景、材料与关键词 → 停止」。不包含推荐、词义修正、保存恢复或真实服务接入。
+实现「模拟榜单 / 手动输入 → 模拟研究 → 背景、材料与关键词 → 修正词义 / 补词 / 本轮选词 → 明确点击模拟推荐」。研究完成会停止等待操作；不包含草稿编辑、选用、历史轮次、保存恢复或真实服务接入。
 
 页面已按研究工作区重构：宽屏并排展示榜单、输入和结果，小屏纵向排列，手机首次打开默认折叠榜单。包含内联校验、加载骨架、步骤状态、保留输入的错误重试、键盘焦点与减少动画支持。
 
@@ -19,11 +19,16 @@
 2. 展开可选线索，填写来源链接、地点、事件时间和关注点；可粘贴人工材料并注明来源。
 3. 点击「开始模拟研究」，查看等待、整理材料、提取关键词及完成状态。执行期间锁定输入与提交，筛选榜单仍可操作；执行失败可显式重试。
 4. 查看研究卡、缺口及关键词出处；点击 S1 可展开材料。人工原文完整保留，标注未回查；转载与原材料归入同一内容链。
-5. 展开「候选接口记录」，查看本次操作的完整模拟请求与响应。
+5. 在「从关键词到选题」中保存词义修正；原词、原文和原 AI 解释仍保留。留空保存可撤销修正。未保存的修改会阻止推荐并提示先保存。
+6. 点击「直接推荐」，模拟从材料原词中取角度；或勾选关键词、展开「我来挑关键词」，点击「使用本轮选词推荐」。补词默认未选中，人工模式仅提交本轮所选词，可分别成题。
+7. 每次最多三题，展示标题、开场、知识问题、所用词、关联理由、画面方向与待查证点。勾选「演示零候选」后再次点击推荐，可查看零候选及理由。
+8. 展开「候选接口记录」，查看本次操作的完整模拟请求与响应。关键词与解释在发起推荐时形成快照，后续修正不改变已有候选；当前界面只展示最新一次结果，历史切换由 ticket03 提供。
 
 三条榜单使用各自的虚构夹具；任意手动标题使用明确标注的通用模板，**不会分析该标题的真实语义或真实事件**。修改榜单标题后转为手动入口，避免套用原事件夹具。人工材料仅展示原文，不自动参与模拟提词。来源地址使用保留的 `.invalid` 域名，不访问原页面。
 
-数据只存于当前浏览器页面的内存，刷新即清空。静态服务只支持读取，不包含业务写接口。API 收费请求、正式资料写入、推荐请求均为零。模拟流程不能证明真实取材质量、引用校验、费用保护或持久化已实现。
+数据只存于当前浏览器页面的内存，刷新即清空。静态服务只支持读取，不包含业务写接口。API 收费请求、正式资料写入均为零；推荐请求只是内存适配器记录。模拟流程不能证明真实取材质量、引用校验、费用保护或持久化已实现。
+
+推荐也是固定交互夹具：六个材料原词有示例角度，其他词使用显式标注的通用问题模板；直接模式从材料原词取前三个，人工模式从本轮选词取前三个。修正进入解释快照和关联理由，标题与问题不执行语义推理，需人工复核。零候选由演示选项控制，不代表已判定真实材料不足。切换热点或修改研究输入会清除当前研究、修正与候选。
 
 修改任意研究输入会清除旧研究卡，避免把旧结果误认为当前输入的结果。标题的字符计数、空白校验及来源链接校验均在本地执行；无效字段会自动展开并获得焦点。
 
@@ -35,7 +40,8 @@
 - `public/styles.css`：集中设计变量、组件状态与响应式布局，使用可读的分区规则。
 - `public/app.js`：交互控制、校验及执行状态；通过适配器发起模拟任务。
 - `public/views.js`：结果及列表渲染，用户文本统一转义，日期格式器复用。
-- `public/mock-api.js`：原有内存模拟数据与候选接口，重构未改业务响应。
+- `public/recommendation.js`：词义修正、补词、选词与推荐交互及其结果渲染，复用现有转义和图标。
+- `public/mock-api.js`：内存模拟数据、推荐夹具及候选接口记录。
 
 设计约定见 [DESIGN.md](DESIGN.md)。不加载外部字体、图标脚本或 CDN；无第三方运行时依赖。源码即运行产物，无需打包构建。可在 PowerShell 检查 ES 模块语法：
 
@@ -43,6 +49,7 @@
 Get-Content topic_workbench/public/app.js -Raw | node --input-type=module --check
 Get-Content topic_workbench/public/views.js -Raw | node --input-type=module --check
 Get-Content topic_workbench/public/mock-api.js -Raw | node --input-type=module --check
+Get-Content topic_workbench/public/recommendation.js -Raw | node --input-type=module --check
 ```
 
 ## 候选接口契约（未确认）
@@ -54,6 +61,14 @@ Get-Content topic_workbench/public/mock-api.js -Raw | node --input-type=module -
 | 创建热点 | `POST /api/hotspots` | `{id, mock: true, input}` |
 | 发起研究 | `POST /api/hotspots/:id/research`，`{operation_id}` | `{id, hotspot_id, operation_id, mock, status: "queued", stage, result: null}` |
 | 查看任务 | `GET /api/tasks/:id` | 同一任务身份，`status: running / completed`，`stage`；完成后包含 `result` |
+| 保存 / 撤销词义修正 | `PATCH /api/research/:id/keywords/:keywordId`，`{correction: string / null}` | `{keyword_id, correction, mock: true}`，不改原词与原解释 |
+| 人工补词 | `POST /api/research/:id/keywords`，`{term, meaning}` | `{id, term, meaning, kind: "manual", mock: true}`；默认未选中 |
+| 本轮选词 | `PUT /api/research/:id/selection`，`{keyword_ids}` | `{keyword_ids, mock: true}`；不发起推荐 |
+| 发起推荐 | `POST /api/research/:id/recommendations`，`{operation_id, mode: "direct" / "manual", keywords, demo_outcome: "normal" / "empty"}` | `{id, kind: "recommendation", research_id, operation_id, mock, status: "queued", stage, snapshot, result: null}`；读取原任务取得结果 |
+
+推荐 `keywords` 是本轮输入快照，保留 `id, term, meaning, correction` 以及已有的引用与来源字段；人工词带 `kind: manual`。`demo_outcome` 仅用于原型演示，不是正式业务参数。推荐完成结果为 `{id, research_id, mock, mode, keyword_snapshot, candidates, empty_reason, usage}`。每个候选包含 `id, title, opening, knowledge_question, used_keyword_ids, association_reason, visual_direction, verification_points`；零候选时 `candidates: []` 且 `empty_reason` 非空。
+
+修正、补词与选词由页面保存于内存，适配器记录对应动作；尚无服务端状态写入。推荐发起后锁定输入和两种推荐按钮，重复点击不创建第二个操作；同一研究及 `operation_id` 复用任务。失败保留研究、修正和已有候选，不自动重试，用户可再次明确点击推荐。推荐不重新研究、不读取网页。
 
 热点输入字段：`entry_kind`（hotlist / manual）、`entry_id`、`platform`、`rank`、`collected_at`、`title`、`source_url`、`location`、`event_time`、`focus`、`manual_material: {text, source_description} | null`。未知值为 null。`title` 必填，纯空白不提交。来源链接使用浏览器 URL 校验。
 
@@ -72,3 +87,7 @@ Get-Content topic_workbench/public/mock-api.js -Raw | node --input-type=module -
 Browser plugin not available；使用已有 Playwright 与本机 Chromium。重构后14组检查通过，覆盖三平台与手动研究、线索和人工原文、安全文本渲染、加载防重复、出处展开及焦点、平台筛选的键盘焦点、空标题切换恢复、隐藏无效URL字段展开、输入修改清除旧结果、注入失败后的显式重试、手机首次使用与研究、减少动画和次要文字对比度。布局覆盖320/390/768/1280/1440像素。控制台无错误，网络仅本机静态GET请求，正式账本哈希不变。
 
 重构验收结果：[JSON记录](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c1d-96eb-71b0-8bd4-f224c1fd541d/refactor-qa.json)；[浏览器验收脚本](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c1d-96eb-71b0-8bd4-f224c1fd541d/refactor-qa.cjs)。原有29项离线测试保留并回归。当前仅验证Chromium；未做真实服务、跨浏览器或完整读屏器验收。
+
+ticket02 验收：13组浏览器行为检查通过，覆盖修正分离与保存、HTML安全渲染、未保存修正提示、补词默认不选、直接推荐快照、人工选词隔离与分别成题、最多三题、零候选及理由、失败保留与显式重试、重复点击、键盘与减少动画、热点切换，以及1440/1280/768/390/320宽度无横向溢出。29项既有离线测试通过；所有ES模块语法检查通过。源码即产物，无打包步骤。网络仅本机静态GET、控制台无错误、正式账本哈希一致。
+
+验收证据保存在仓库之外：[结果](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c82-2a2d-7193-876c-c2ad17df8593/ticket02-qa.json)、[可重跑脚本](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c82-2a2d-7193-876c-c2ad17df8593/ticket02-qa.cjs)、[桌面](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c82-2a2d-7193-876c-c2ad17df8593/ticket02-desktop.png)、[手机](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c82-2a2d-7193-876c-c2ad17df8593/ticket02-mobile.png)。机械视觉检测以降级正则模式运行，缺少解析依赖；仅报告既有颜色字面量，不能替代浏览器视觉检查。

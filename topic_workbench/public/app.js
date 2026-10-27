@@ -1,5 +1,6 @@
 import { hotlist, mockApi, exchanges } from './mock-api.js';
 import { escapeHtml, icon, hotspotView, researchView, loadingView } from './views.js';
+import { mountRecommendation } from './recommendation.js';
 
 const $ = (selector) => document.querySelector(selector);
 const form = $('#research-form');
@@ -31,6 +32,7 @@ function setStep(researching) {
   $('#input-step').classList.toggle('current', !researching);
   $('#input-step').classList.toggle('complete', researching);
   $('#research-step').classList.toggle('current', researching);
+  $('#research-step').classList.remove('complete');
   const current = researching ? $('#research-step') : $('#input-step');
   const previous = researching ? $('#input-step') : $('#research-step');
   previous.removeAttribute('aria-current');
@@ -44,6 +46,10 @@ function clearValidation() {
 }
 
 function resetResult() {
+  $('#recommendation').hidden = true;
+  $('#recommendation').replaceChildren();
+  $('#recommendation-step').classList.remove('current');
+  $('#recommendation-step').removeAttribute('aria-current');
   $('#result').replaceChildren();
   $('#status').replaceChildren();
   $('#empty').hidden = false;
@@ -128,12 +134,12 @@ function readInput() {
   };
 }
 
-function setBusy(value) {
+function setBusy(value, label = '模拟研究中…') {
   busy = value;
   output.setAttribute('aria-busy', String(value));
   form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = value; });
   $('#submit').innerHTML = value
-    ? '<span class="spinner" aria-hidden="true"></span><span>模拟研究中…</span>'
+    ? `<span class="spinner" aria-hidden="true"></span><span>${label}</span>`
     : `${icon('search')}<span>开始模拟研究</span>${icon('arrow')}`;
   renderList();
 }
@@ -163,7 +169,8 @@ form.addEventListener('submit', async (event) => {
       task = mockApi.getTask(task.id);
     }
     $('#result').innerHTML = researchView(task.result, input);
-    $('#status').innerHTML = `<div class="status-success">${icon('check')}模拟研究完成 · 未生成选题候选</div>`;
+    mountRecommendation(task.result, { setBusy, updateContract, setOutputState });
+    $('#status').innerHTML = `<div class="status-success">${icon('check')}模拟研究完成 · 未自动生成选题候选</div>`;
     setOutputState('提词完成', 'success');
   } catch {
     $('#result').replaceChildren();
@@ -178,7 +185,7 @@ form.addEventListener('submit', async (event) => {
 $('#status').addEventListener('click', (event) => {
   if (event.target.closest('#retry') && !busy) form.requestSubmit();
 });
-$('#result').addEventListener('click', (event) => {
+output.addEventListener('click', (event) => {
   const link = event.target.closest('.source-ref');
   if (!link) return;
   const material = document.getElementById(link.hash.slice(1));

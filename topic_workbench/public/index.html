@@ -34,7 +34,7 @@
       <ol class="workflow" aria-label="创作流程">
         <li class="current" id="input-step" aria-current="step"><span class="step-number">1</span>选择热点</li>
         <li id="research-step"><span class="step-number">2</span>研究与提词</li>
-        <li class="upcoming"><span class="step-number">3</span>推荐草稿<span class="sr-only">，后续任务提供</span></li>
+        <li id="recommendation-step"><span class="step-number">3</span>推荐草稿</li>
       </ol>
     </div>
     <div class="workspace">
@@ -79,6 +79,7 @@
           <div id="status" role="status" aria-live="polite" aria-atomic="true"></div>
           <div id="empty" class="empty"><div class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></div><h3>每个好选题，都从理解开始。</h3><p>选一个热点并发起模拟研究。<br>在这里梳理背景、材料与有出处的原词。</p><div class="empty-outline" aria-hidden="true"><div><span></span><i></i></div><div><span></span><i></i></div><div><span></span><i></i></div></div><span class="empty-note">研究完成后停在提词，不会自动生成选题。</span></div>
           <div id="result"></div>
+          <section id="recommendation" class="recommendation" aria-labelledby="recommendation-heading" hidden></section>
         </section>
       </div>
     </div>

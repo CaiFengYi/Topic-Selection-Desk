@@ -21,7 +21,7 @@ export function hotspotView(item, selected, busy) {
 function keywordView(keyword) {
   return `<section class="keyword">
     <div class="keyword-heading"><span class="keyword-id">${escapeHtml(keyword.id)}</span><h4>${escapeHtml(keyword.term)}</h4>${sources([keyword.source_id])}</div>
-    <p>${escapeHtml(keyword.meaning)}</p><blockquote>“${escapeHtml(keyword.quote)}”</blockquote>
+    <p>原 AI 解释 · ${escapeHtml(keyword.meaning)}</p><blockquote>“${escapeHtml(keyword.quote)}”</blockquote>
     <small>说话者：${escapeHtml(keyword.speaker)} · 肯定语境 · 未核实</small>
   </section>`;
 }
@@ -52,7 +52,7 @@ export function researchView(result, input) {
     <section class="result-section"><h3>关键词 <span class="count">${result.keywords.length} 个原词 · 模拟提取</span></h3><div class="keywords">${result.keywords.map(keywordView).join('')}</div></section>
     <section class="result-section"><h3>研究缺口</h3><div class="gap">${icon('info')}<p>${escapeHtml(result.gaps[0])}</p></div></section>
     <section class="result-section"><h3>所用材料 <span class="count">${result.materials.length} 份 · 含重复内容</span></h3>${result.materials.map(materialView).join('')}</section>
-    <div class="stop">${icon('check')}<div><strong>研究已完成，下一步由你决定。</strong><p>当前未生成任何选题候选。推荐与草稿将在后续任务提供。</p></div></div>
+    <div class="stop">${icon('check')}<div><strong>研究已完成，下一步由你决定。</strong><p>可在下方修正词义或挑选关键词。只有点击推荐才会生成模拟候选。</p></div></div>
   </article>`;
 }
 

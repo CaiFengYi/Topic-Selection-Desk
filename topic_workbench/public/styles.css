@@ -224,6 +224,43 @@ pre { max-height: 320px; margin: 0 0 var(--space-4); overflow: auto; white-space
 .stop strong { font-size: 12px; font-weight: 500; }
 .stop p { margin-top: 5px; font-size: 11px; color: var(--muted); }
 footer { display: flex; justify-content: space-between; align-items: center; gap: var(--space-4); margin-top: var(--space-6); color: var(--muted); font-size: 11px; }
+.recommendation { padding: var(--space-5); border-top: 1px solid var(--line); }
+.section-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); margin-bottom: var(--space-2); }
+.editable-keyword { padding: var(--space-4) 0; border-bottom: 1px solid var(--line); }
+.keyword-choice { display: flex; gap: var(--space-3); align-items: start; min-height: 44px; cursor: pointer; }
+.keyword-choice input { width: 18px; height: 18px; min-height: 18px; margin: 4px 0 0; flex: none; accent-color: var(--accent); }
+.keyword-choice span { min-width: 0; overflow-wrap: anywhere; }
+.keyword-choice small { display: block; font-size: 11px; font-weight: 400; color: var(--muted); }
+.editable-keyword p, .round-snapshot p { font-size: 12px; overflow-wrap: anywhere; white-space: pre-wrap; }
+.saved-correction { margin-top: var(--space-2); color: var(--accent); }
+.correction-editor > summary, .supplement > summary, #manual-recommend > summary, .round-snapshot > summary { display: flex; align-items: center; gap: var(--space-2); min-height: 44px; color: var(--accent); font-size: 12px; }
+.correction-editor > summary .icon, .supplement > summary .icon, #manual-recommend > summary .icon, .round-snapshot > summary .icon { width: 15px; height: 15px; }
+.recommendation form { padding: 0; display: grid; gap: var(--space-2); }
+.recommendation form button { justify-self: start; margin-top: var(--space-2); }
+.recommendation textarea { min-height: 76px; }
+.supplement { margin-top: var(--space-2); }
+.edit-feedback { color: var(--accent); font-size: 12px; margin: var(--space-3) 0; overflow-wrap: anywhere; }
+.edit-feedback:empty { margin: 0; }
+.recommendation-actions { margin-top: var(--space-5); padding: var(--space-4); background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius); }
+.recommendation-actions > .primary > .icon { margin-left: 0; }
+.recommendation-actions > p { margin-top: var(--space-2); }
+#manual-recommend { margin-top: var(--space-3); border-top: 1px solid var(--line); }
+#manual-recommend button { margin-top: var(--space-3); width: 100%; }
+.demo-option { margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+#recommendation-feedback:not(:empty) { margin-top: var(--space-5); color: var(--accent); font-size: 12px; }
+.recommendation-idle { padding: var(--space-5) 0 0; font-size: 12px; color: var(--muted); }
+.candidate-results { margin-top: var(--space-6); }
+.candidate-results > h3 { font-size: 15px; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.candidate-results > .gap { margin-top: var(--space-4); }
+.round-snapshot { margin-top: var(--space-3); }
+.round-snapshot p + p { margin-top: var(--space-2); }
+.candidate { padding-top: var(--space-5); margin-top: var(--space-5); border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.candidate h4 { font-size: 18px; line-height: 1.6; margin: var(--space-3) 0 var(--space-2); }
+.candidate-opening { font-size: 13px; color: var(--muted); line-height: 1.9; }
+.candidate dl { display: grid; gap: var(--space-3); margin: var(--space-4) 0 0; font-size: 12px; }
+.candidate dt { color: var(--muted); margin-bottom: var(--space-1); }
+.candidate dd { margin: 0; white-space: pre-wrap; }
+.candidate ul { padding-left: var(--space-4); margin: 0; }
 footer > span { display: flex; align-items: center; gap: var(--space-2); }
 footer b { font-weight: 500; color: var(--accent); font-variant-numeric: tabular-nums; }
 .footer-divider { margin: 0 var(--space-2); color: var(--control-line); }
@@ -263,6 +300,7 @@ footer b { font-weight: 500; color: var(--accent); font-variant-numeric: tabular
   .hotspot-link { margin-top: var(--space-1); }
   .panel-heading { padding: var(--space-4); }
   form, .research-card { padding: var(--space-4); }
+  .recommendation { padding: var(--space-4); }
   .contract { padding: 0 var(--space-4); }
   .empty { padding: var(--space-10) var(--space-4) var(--space-8); }
   .empty h3 { font-size: 15px; }
