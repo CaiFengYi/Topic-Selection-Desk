@@ -1,16 +1,72 @@
 import { hotlist, mockApi, exchanges } from './mock-api.js';
+import { escapeHtml, icon, hotspotView, researchView, loadingView } from './views.js';
 
 const $ = (selector) => document.querySelector(selector);
 const form = $('#research-form');
+const title = $('#title');
+const output = $('.output-panel');
 let selectedEntry = null;
 let activePlatform = '全部';
 let busy = false;
-const escape = (value) => String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
-const time = (value) => value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Hong_Kong' }).format(new Date(value)) + ' +08:00' : '未知 / 未提供';
 
 function renderList() {
-  $('#platforms').innerHTML = ['全部', 'B站', '抖音', '微博'].map((platform) => `<button type="button" aria-pressed="${activePlatform === platform}" data-platform="${platform}">${platform}</button>`).join('');
-  $('#hotlist').innerHTML = hotlist.filter((item) => activePlatform === '全部' || item.platform === activePlatform).map((item) => `<button type="button" class="hotspot ${selectedEntry?.id === item.id ? 'selected' : ''}" data-entry="${item.id}" ${busy ? 'disabled' : ''} aria-pressed="${selectedEntry?.id === item.id}"><span class="rank">0${item.rank}</span><span><small>${item.platform} · 模拟排名 ${item.rank}</small><strong>${escape(item.title)}</strong><span class="hotspot-link">带入研究表单 ↗</span></span></button>`).join('');
+  if (!$('#platforms').childElementCount) {
+    $('#platforms').innerHTML = ['全部', 'B站', '抖音', '微博'].map((platform) =>
+      `<button type="button" data-platform="${platform}">${platform}</button>`).join('');
+  }
+  $('#platforms').querySelectorAll('button').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.platform === activePlatform));
+  });
+  $('#hotlist').innerHTML = hotlist
+    .filter((item) => activePlatform === '全部' || item.platform === activePlatform)
+    .map((item) => hotspotView(item, selectedEntry?.id === item.id, busy)).join('');
+}
+
+function setOutputState(text, tone = 'neutral') {
+  $('#output-state').textContent = text;
+  $('#output-state').className = `badge ${tone}`;
+}
+
+function setStep(researching) {
+  $('#input-step').classList.toggle('current', !researching);
+  $('#input-step').classList.toggle('complete', researching);
+  $('#research-step').classList.toggle('current', researching);
+  const current = researching ? $('#research-step') : $('#input-step');
+  const previous = researching ? $('#input-step') : $('#research-step');
+  previous.removeAttribute('aria-current');
+  current.setAttribute('aria-current', 'step');
+}
+
+function clearValidation() {
+  title.setCustomValidity('');
+  form.querySelectorAll('[aria-invalid]').forEach((field) => field.removeAttribute('aria-invalid'));
+  $('#form-error').hidden = true;
+}
+
+function resetResult() {
+  $('#result').replaceChildren();
+  $('#status').replaceChildren();
+  $('#empty').hidden = false;
+  $('#contract').textContent = '尚未提交研究请求。';
+  setOutputState('等待研究');
+  setStep(false);
+}
+
+function updateTitleCount() {
+  $('#title-count').textContent = `${title.value.length} / 500`;
+}
+
+function chooseEntry(entry) {
+  selectedEntry = entry;
+  form.reset();
+  clearValidation();
+  title.value = entry?.title || '';
+  form.elements.source_url.value = entry?.source_url || '';
+  $('#entry-label').textContent = entry ? `${entry.platform} · 榜单入口` : '手动添加';
+  updateTitleCount();
+  resetResult();
+  renderList();
+  title.focus();
 }
 
 $('#platforms').addEventListener('click', (event) => {
@@ -21,89 +77,118 @@ $('#platforms').addEventListener('click', (event) => {
 });
 $('#hotlist').addEventListener('click', (event) => {
   const button = event.target.closest('[data-entry]');
-  if (!button || busy) return;
-  form.reset();
-  selectedEntry = hotlist.find((item) => item.id === button.dataset.entry);
-  form.elements.title.value = selectedEntry.title;
-  form.elements.source_url.value = selectedEntry.source_url;
-  $('#entry-label').textContent = `${selectedEntry.platform} · 模拟榜单入口`;
-  resetResult();
-  renderList();
-  $('#title').focus();
+  if (button && !busy) chooseEntry(hotlist.find((item) => item.id === button.dataset.entry));
 });
-$('#manual').addEventListener('click', () => {
-  if (busy) return;
-  selectedEntry = null;
-  form.reset();
-  $('#entry-label').textContent = '手动添加';
-  resetResult();
-  renderList();
-  $('#title').focus();
-});
-// Editing a list title creates a manual input, rather than attaching an unrelated fixture.
-$('#title').addEventListener('input', () => {
-  if (selectedEntry && form.elements.title.value !== selectedEntry.title) {
+$('#manual').addEventListener('click', () => { if (!busy) chooseEntry(null); });
+
+form.addEventListener('input', () => {
+  clearValidation();
+  updateTitleCount();
+  if (selectedEntry && title.value !== selectedEntry.title) {
     selectedEntry = null;
     $('#entry-label').textContent = '手动添加（已修改标题）';
     renderList();
   }
+  // An edited request must not keep displaying a card from the previous inputs.
+  resetResult();
 });
 
-function resetResult() {
-  $('#result').replaceChildren();
-  $('#status').replaceChildren();
-  $('#empty').hidden = false;
-  $('#research-step').classList.remove('current');
+function validateForm() {
+  clearValidation();
+  if (!title.value.trim()) title.setCustomValidity('请输入热点标题或描述');
+  if (form.checkValidity()) return true;
+  const invalid = form.querySelector(':invalid');
+  invalid.closest('details')?.setAttribute('open', '');
+  invalid.setAttribute('aria-invalid', 'true');
+  $('#form-error').textContent = invalid === title
+    ? '请输入热点标题或描述，再开始研究。'
+    : '来源链接格式不正确，请填写完整网址，例如 https://example.com。';
+  $('#form-error').hidden = false;
+  invalid.focus();
+  return false;
 }
 
-function renderResult(result, input) {
-  const sources = (ids) => ids.map((id) => `<a class="source-ref" href="#source-${id}">${escape(id)}</a>`).join(' ');
-  $('#result').innerHTML = `<article class="research-card"><div class="result-heading"><div><p class="eyebrow">RESEARCH CARD / 模拟研究卡</p><h2>${escape(result.event.title)}</h2></div><span class="tag">提词完成</span></div>
-    <p class="notice">${escape(result.warnings[0].message)} 有出处不代表事实已核实。</p>
-    <dl class="event-meta"><div><dt>事件时间 · 用户线索</dt><dd>${escape(result.event.event_time || '未知 / 未提供')}</dd></div><div><dt>榜单采集时间 · 模拟</dt><dd>${escape(input.collected_at ? time(input.collected_at) : '手动输入，无榜单采集时间')}</dd></div><div><dt>地点 · 用户线索</dt><dd>${escape(result.event.location || '未提供')}</dd></div><div><dt>关注点</dt><dd>${escape(input.focus || '未提供')}</dd></div></dl>
-    <p class="muted">来源线索：${escape(input.source_url || '未提供')}（未访问）</p>
-    <h3>背景与语境</h3>${result.background.map((item) => `<p>${escape(item.text)} ${sources(item.source_ids)}<small class="attribution">来源说法 · ${escape(item.speaker)} · 未核实</small></p>`).join('')}
-    <h3>关键词 <span class="count">${result.keywords.length} 个原词 · 模拟提取</span></h3><div class="keywords">${result.keywords.map((keyword) => `<section class="keyword"><div><span class="keyword-id">${keyword.id}</span><h4>${escape(keyword.term)}</h4>${sources([keyword.source_id])}</div><p>${escape(keyword.meaning)}</p><blockquote>“${escape(keyword.quote)}”</blockquote><small>说话者：${escape(keyword.speaker)} · 肯定语境 · 未核实</small></section>`).join('')}</div>
-    <h3>研究缺口</h3><div class="gap">${escape(result.gaps[0])}</div>
-    <h3>所用材料 <span class="count">网页与人工材料分开记录</span></h3>${result.materials.map((material) => `<details class="material" id="source-${material.id}"><summary><span>${material.id} · ${escape(material.title)}</span><span class="material-state">${material.kind === 'manual' ? '人工补充 · 未回查' : material.status === 'duplicate' ? '重复内容 · 同一来源链' : '模拟已读正文'}</span></summary><div class="material-body"><p>来源：${escape(material.source_url || material.source_description || '用户未说明')}</p><p>发布时间：${time(material.published_at)}<br>读取时间：${time(material.read_at)}${material.submitted_at ? `<br>人工提交时间：${time(material.submitted_at)}` : ''}</p><p class="material-text">${escape(material.text)}</p>${material.evidence_group ? '<small>S1 与 S2 为同一虚构材料链，不能当作独立佐证。</small>' : '<small>用户提供的原始文本，未访问来源、未核实。</small>'}</div></details>`).join('')}
-    <div class="stop"><span>✓</span><div><strong>研究到这里，先停一下。</strong><p>已展示模拟关键词；推荐与草稿将在后续任务提供。当前未生成任何选题候选。</p></div></div></article>`;
-  document.querySelectorAll('.source-ref').forEach((link) => link.addEventListener('click', () => { $(link.getAttribute('href')).open = true; }));
+function readInput() {
+  const values = Object.fromEntries(new FormData(form));
+  return {
+    entry_kind: selectedEntry ? 'hotlist' : 'manual',
+    entry_id: selectedEntry?.id || null,
+    platform: selectedEntry?.platform || null,
+    rank: selectedEntry?.rank || null,
+    collected_at: selectedEntry?.collected_at || null,
+    title: values.title.trim(),
+    source_url: values.source_url.trim() || null,
+    location: values.location.trim() || null,
+    event_time: values.event_time.trim() || null,
+    focus: values.focus.trim() || null,
+    manual_material: values.material_text.trim() ? {
+      text: values.material_text,
+      source_description: values.material_source.trim() || null,
+    } : null,
+  };
+}
+
+function setBusy(value) {
+  busy = value;
+  output.setAttribute('aria-busy', String(value));
+  form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = value; });
+  $('#submit').innerHTML = value
+    ? '<span class="spinner" aria-hidden="true"></span><span>模拟研究中…</span>'
+    : `${icon('search')}<span>开始模拟研究</span>${icon('arrow')}`;
+  renderList();
+}
+
+function updateContract() {
+  $('#contract').textContent = JSON.stringify(exchanges, null, 2);
 }
 
 form.addEventListener('submit', async (event) => {
   event.preventDefault();
-  if (busy) return;
-  const values = Object.fromEntries(new FormData(form));
-  if (!values.title.trim()) { $('#title').setCustomValidity('请输入热点标题或描述'); $('#title').reportValidity(); return; }
-  const input = { entry_kind: selectedEntry ? 'hotlist' : 'manual', entry_id: selectedEntry?.id || null, platform: selectedEntry?.platform || null, rank: selectedEntry?.rank || null, collected_at: selectedEntry?.collected_at || null, title: values.title.trim(), source_url: values.source_url.trim() || null, location: values.location.trim() || null, event_time: values.event_time.trim() || null, focus: values.focus.trim() || null, manual_material: values.material_text.trim() ? { text: values.material_text, source_description: values.material_source.trim() || null } : null };
-  busy = true;
+  if (busy || !validateForm()) return;
+  const input = readInput();
   resetResult();
+  setBusy(true);
+  setStep(true);
+  setOutputState('研究中', 'success');
   $('#empty').hidden = true;
-  $('#research-step').classList.add('current');
-  form.querySelectorAll('input, textarea, button').forEach((element) => { element.disabled = true; });
-  renderList();
-  $('#submit').textContent = '模拟研究中…';
+  $('#result').innerHTML = loadingView();
   try {
     exchanges.length = 0;
     const hotspot = mockApi.createHotspot(input);
     let task = mockApi.startResearch(hotspot.id, crypto.randomUUID());
     while (task.status !== 'completed') {
-      $('#status').innerHTML = `<div class="progress"><span class="spinner"></span><div><strong>${escape(task.stage)}</strong><p>模拟执行中 · 请稍候，不会调用检索或模型服务</p></div></div>`;
-      $('#contract').textContent = JSON.stringify(exchanges, null, 2);
+      $('#status').innerHTML = `<div class="progress"><div class="progress-heading"><span class="spinner" aria-hidden="true"></span><strong>${escapeHtml(task.stage)}</strong></div><p>模拟执行中，不会调用检索或模型服务。</p></div>`;
+      updateContract();
       await new Promise((resolve) => setTimeout(resolve, 450));
       task = mockApi.getTask(task.id);
     }
-    $('#status').textContent = '模拟研究完成 · API 收费请求 0 · 正式数据写入 0';
-    renderResult(task.result, input);
-    $('#contract').textContent = JSON.stringify(exchanges, null, 2);
+    $('#result').innerHTML = researchView(task.result, input);
+    $('#status').innerHTML = `<div class="status-success">${icon('check')}模拟研究完成 · 未生成选题候选</div>`;
+    setOutputState('提词完成', 'success');
   } catch {
-    $('#status').textContent = '原型执行失败；未调用收费服务。请重新发起模拟研究。';
+    $('#result').replaceChildren();
+    $('#status').innerHTML = `<div class="error-state">${icon('info')}<div><h3>模拟研究未完成</h3><p>本次原型执行出现错误。输入已保留，你可以重新发起；未调用任何收费服务。</p><button id="retry" class="secondary" type="button">${icon('retry')}重新模拟研究</button></div></div>`;
+    setOutputState('执行失败', 'error');
   } finally {
-    busy = false;
-    form.querySelectorAll('input, textarea, button').forEach((element) => { element.disabled = false; });
-    $('#submit').innerHTML = '再次模拟研究 <span>↗</span>';
-    renderList();
+    updateContract();
+    setBusy(false);
   }
 });
-$('#title').addEventListener('input', () => $('#title').setCustomValidity(''));
+
+$('#status').addEventListener('click', (event) => {
+  if (event.target.closest('#retry') && !busy) form.requestSubmit();
+});
+$('#result').addEventListener('click', (event) => {
+  const link = event.target.closest('.source-ref');
+  if (!link) return;
+  const material = document.getElementById(link.hash.slice(1));
+  if (material) {
+    event.preventDefault();
+    material.open = true;
+    material.querySelector('summary').focus();
+  }
+});
+
+// Native disclosure works at every size; only its initial state differs.
+if (matchMedia('(max-width: 640px)').matches) $('#discovery').open = false;
 renderList();

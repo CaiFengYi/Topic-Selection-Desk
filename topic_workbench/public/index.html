@@ -4,33 +4,85 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f6f8f7">
   <title>选题台 · 热点研究原型</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="app.js"></script>
 </head>
 <body>
-  <header class="topbar"><a class="brand" href="/">选题台<span>TOPIC DESK</span></a><span class="mode">模拟原型 · 不调用付费服务</span></header>
+  <svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-desk" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7m-3.5-3.5v7"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Zm0 0v6h6M8 13h8m-8 4h5"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10v.1"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M3 11a9 9 0 1 1 2 7M3 4v7h7"/></symbol>
+  </svg>
+  <a class="skip-link" href="#title">跳到热点输入</a>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="选题台首页"><span class="brand-mark"><svg class="icon" aria-hidden="true"><use href="#i-desk"/></svg></span>选题台<span class="brand-divider"></span><span class="brand-context">创作研究工作台</span></a>
+    <span class="mode"><span class="status-dot"></span>模拟模式<span class="mode-detail"> · 零付费调用</span></span>
+  </header>
   <main>
-    <div class="page-heading"><div><p class="eyebrow">从热点，到值得问的问题</p><h1>先理解语境，再找到切口。</h1><p>选一个热点，整理材料与原词。让每个创作方向，都有来处。</p></div><div class="edition">WORKBENCH / 01<br><span>热点研究</span></div></div>
-    <nav class="workflow" aria-label="创作流程"><span class="current">01 <b>选择热点</b></span><span id="research-step">02 <b>研究与提词</b></span><span>03 <b>推荐与草稿 · 后续任务</b></span></nav>
-    <div class="workspace">
-      <aside class="hotlist"><div class="section-title"><h2>发现热点</h2><span class="tag">模拟榜单</span></div><p class="muted">演示条目，不代表当前平台热度。</p><div id="platforms" class="platforms" role="group" aria-label="筛选平台"></div><div id="hotlist"></div><p class="list-note">榜单采集时间（模拟）<br>2026-10-27 10:00 +08:00<br><span>采集时间不是事件发生时间。</span></p></aside>
-      <section class="research"><div class="section-title"><h2>热点研究</h2><span id="entry-label" class="muted">手动添加</span></div>
-        <form id="research-form">
-          <div class="field-heading"><label for="title">你想研究什么？ <span class="required">*</span></label><button type="button" id="manual" class="text-button">手动添加新热点 ↗</button></div>
-          <textarea id="title" name="title" rows="2" maxlength="500" required placeholder="输入热点标题或描述，也可以从左侧榜单选择"></textarea>
-          <details id="clues"><summary>补充事件线索 <span>可选 · 帮助定位具体事件</span></summary><div class="clue-grid"><label>来源链接<input name="source_url" type="url" placeholder="https://…"></label><label>地点<input name="location" maxlength="100" placeholder="事件相关地点"></label><label>事件时间<input name="event_time" maxlength="100" placeholder="如：2026-10-26，或暂不确定"></label><label>关注点<input name="focus" maxlength="500" placeholder="希望了解的语境或问题"></label></div></details>
-          <details id="manual-materials"><summary>人工补充材料 <span>可选 · 评论、字幕或梗的解释</span></summary><label for="material-text">材料原文</label><textarea id="material-text" name="material_text" rows="3" maxlength="10000" placeholder="粘贴原始文本；不会自动回查或核实"></textarea><label for="material-source">来源说明</label><input id="material-source" name="material_source" maxlength="500" placeholder="如：视频标题、评论作者、链接或取得方式"><p class="muted">保留你的原文与来源说明，单独标记为「人工补充 · 未回查」。</p></details>
-          <div class="form-footer"><p>仅演示研究流程<br><span>API 收费请求 0 · 正式数据写入 0</span></p><button id="submit" class="primary" type="submit">开始模拟研究 <span>↗</span></button></div>
-        </form>
-        <div id="status" role="status" aria-live="polite"></div>
-        <div id="result"></div>
-        <div id="empty" class="empty"><div class="orb">⌕</div><h3>把热点放到研究桌上</h3><p>从榜单点选，或输入一个新话题。<br>发起研究后，在这里查看背景、材料和关键词。</p><span>研究结束后停止，等待你的下一步判断。</span></div>
-        <details class="contract"><summary>候选接口记录 <span>仅模拟，待 ticket04 确认</span></summary><pre id="contract">尚未提交研究请求。</pre></details>
-      </section>
+    <div class="page-heading">
+      <div><h1>热点研究</h1><p>先理解事件语境，再找到有出处的创作线索。</p></div>
+      <ol class="workflow" aria-label="创作流程">
+        <li class="current" id="input-step" aria-current="step"><span class="step-number">1</span>选择热点</li>
+        <li id="research-step"><span class="step-number">2</span>研究与提词</li>
+        <li class="upcoming"><span class="step-number">3</span>推荐草稿<span class="sr-only">，后续任务提供</span></li>
+      </ol>
     </div>
-    <footer>LOCAL PROTOTYPE <span>模拟材料用于检验交互，不构成事实核实或真实研究结论。</span></footer>
+    <div class="workspace">
+      <aside class="hotlist" aria-label="发现热点">
+        <details id="discovery" open>
+          <summary class="discovery-heading"><span><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><strong>发现热点</strong></span><span class="badge neutral">模拟榜单</span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+          <div class="discovery-content">
+            <p class="muted">从熟悉的话题开始，也可以手动添加。</p>
+            <div id="platforms" class="platforms" role="group" aria-label="筛选平台"></div>
+            <div id="hotlist"></div>
+            <div class="list-note"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg><p>模拟采集于 10-27 10:00 +08:00<br><span>非实时榜单 · 采集时间不是事件时间</span></p></div>
+          </div>
+        </details>
+        <div class="sidebar-note"><svg class="icon" aria-hidden="true"><use href="#i-info"/></svg><p>这里是交互原型。榜单、网页材料与研究结果均为模拟数据。</p></div>
+      </aside>
+      <div class="desk">
+        <section class="input-panel" aria-labelledby="input-heading">
+          <div class="panel-heading"><h2 id="input-heading">研究输入</h2><span id="entry-label" class="badge neutral">手动添加</span></div>
+          <form id="research-form" novalidate>
+            <div class="field-heading"><label for="title">热点标题或描述 <span class="required" aria-hidden="true">*</span></label><button type="button" id="manual" class="text-button"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>手动添加</button></div>
+            <textarea id="title" name="title" rows="4" maxlength="500" required aria-describedby="title-help form-error" placeholder="你想了解哪个热点？输入标题或事件描述…"></textarea>
+            <div class="field-help"><span id="title-help">输入是研究线索，不代表已核实事实。</span><span id="title-count">0 / 500</span></div>
+            <details id="clues" class="form-section">
+              <summary><span class="summary-title"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg>补充事件线索 <span class="optional">可选</span></span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+              <div class="section-fields">
+                <label for="source-url">来源链接</label><input id="source-url" name="source_url" type="url" inputmode="url" placeholder="https://…" aria-describedby="form-error">
+                <div class="clue-grid"><div><label for="location">地点</label><input id="location" name="location" maxlength="100" placeholder="事件相关地点"></div><div><label for="event-time">事件时间</label><input id="event-time" name="event_time" maxlength="100" placeholder="发生时间或暂不确定"></div></div>
+                <label for="focus">关注点</label><input id="focus" name="focus" maxlength="500" placeholder="你希望了解什么？">
+              </div>
+            </details>
+            <details id="manual-materials" class="form-section">
+              <summary><span class="summary-title"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg>人工补充材料 <span class="optional">可选</span></span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
+              <div class="section-fields"><p class="field-description">补充评论、字幕或梗的解释。原文会单独保留，标注为「人工补充 · 未回查」。</p><label for="material-text">材料原文</label><textarea id="material-text" name="material_text" rows="4" maxlength="10000" placeholder="粘贴原始文本…"></textarea><label for="material-source">来源说明</label><input id="material-source" name="material_source" maxlength="500" placeholder="标题、作者、链接或取得方式"></div>
+            </details>
+            <p id="form-error" class="field-error" role="alert" hidden></p>
+            <div class="form-footer"><button id="submit" class="primary" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span>开始模拟研究</span><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button><p>仅模拟演示，不会调用检索或模型服务。</p></div>
+          </form>
+          <details class="contract"><summary><span>候选接口记录</span><span class="optional">开发参考</span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p class="field-description">仅模拟，契约待 ticket04 确认。</p><pre id="contract">尚未提交研究请求。</pre></details>
+        </section>
+        <section class="output-panel" aria-labelledby="output-heading" aria-busy="false">
+          <div class="panel-heading"><h2 id="output-heading">研究结果</h2><span id="output-state" class="badge neutral">等待输入</span></div>
+          <div id="status" role="status" aria-live="polite" aria-atomic="true"></div>
+          <div id="empty" class="empty"><div class="empty-icon"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg></div><h3>每个好选题，都从理解开始。</h3><p>选一个热点并发起模拟研究。<br>在这里梳理背景、材料与有出处的原词。</p><div class="empty-outline" aria-hidden="true"><div><span></span><i></i></div><div><span></span><i></i></div><div><span></span><i></i></div></div><span class="empty-note">研究完成后停在提词，不会自动生成选题。</span></div>
+          <div id="result"></div>
+        </section>
+      </div>
+    </div>
+    <footer><span><span class="status-dot"></span>仅本机运行 · 页面数据刷新后清空</span><span>API 收费请求 <b>0</b><span class="footer-divider">/</span>正式数据写入 <b>0</b></span></footer>
   </main>
 </body>
 </html>
