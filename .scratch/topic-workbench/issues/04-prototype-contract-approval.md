@@ -27,3 +27,9 @@ Status: completed
 
 
 2026-10-27：用户明确回复“接受本次交付，提交”，确认实际原型与本次接口契约。全部验收项完成，Status改为completed，05前置阻塞解除；真实服务接入与相关保护仍按05至12逐项实现和验收。
+
+2026-10-27设计精修：按用户要求检查现有技术栈后，复用原生控件、ES模块、SVG及设计变量，无新增依赖。增加共享noticeView，统一说明/警告/失败样式；异常标题去重并保留状态live region；澄清事件整行按钮展示材料和继续操作提示，已有材料默认折叠；四列语义取材统计；推荐异常采用同一反馈组件。完善下拉框hover、键盘焦点、禁用和手机字号。未改变已确认接口、收费边界及恢复行为，未实施05。
+
+精修验证：14组ticket04浏览器检查、15组ticket03回归、4组设计检查与5个模块语法检查通过。Chromium/Playwright（Browser plugin not available），1440/1280/768/390/320无横向溢出，桌面/手机视觉复核通过；验证整行触控目标、键盘Enter展开、focus-visible、加载锁定、减少动画和文本转义。控制台无错误，网络仅本机静态GET，账本哈希不变。无打包步骤；未重复运行无改动的Python测试。未验证其他浏览器、完整读屏器、真实服务和持久化。机械视觉扫描仍因缺少解析依赖降级，仅作辅助。
+
+精修证据：[设计检查](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c9f-1948-7953-8fc8-8990ef98889b/ticket04-design-qa.json)、[设计脚本](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c9f-1948-7953-8fc8-8990ef98889b/ticket04-design-qa.cjs)、[04回归](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c9f-1948-7953-8fc8-8990ef98889b/ticket04-polish-qa.json)、[03回归](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c9f-1948-7953-8fc8-8990ef98889b/ticket03-polish-qa.json)、[桌面](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c9f-1948-7953-8fc8-8990ef98889b/ticket04-design-clarification-desktop.png)、[手机](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c9f-1948-7953-8fc8-8990ef98889b/ticket04-design-clarification-mobile.png)。

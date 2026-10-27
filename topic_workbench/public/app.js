@@ -49,6 +49,7 @@ function clearValidation() {
 
 function resetResult() {
   pendingTask = null;
+  $('#status').classList.remove('sr-only');
   $('#recommendation').hidden = true;
   $('#recommendation').replaceChildren();
   $('#recommendation-step').classList.remove('current');
@@ -154,6 +155,7 @@ function updateContract() {
 
 async function runResearch(input, resumeEvent = null) {
   if (!resumeEvent) resetResult();
+  $('#status').classList.remove('sr-only');
   setBusy(true);
   setStep(true);
   setOutputState('研究中', 'success');
@@ -178,12 +180,14 @@ async function runResearch(input, resumeEvent = null) {
       pendingInput = input;
       $('#result').innerHTML = taskIssueView(task);
       $('#status').textContent = task.stage;
-      setOutputState(task.stage, 'error');
+      $('#status').classList.add('sr-only');
+      setOutputState(task.status === 'needs_clarification' ? '等待事件确认' : task.stage, task.status === 'failed' ? 'error' : 'warning');
       return;
     }
     $('#result').innerHTML = researchView(task.result, input);
     if (task.result.status === 'no_usable_text') {
       $('#status').textContent = '读取失败 · 未生成研究结果';
+      $('#status').classList.add('sr-only');
       setOutputState('无可用正文', 'error');
       return;
     }

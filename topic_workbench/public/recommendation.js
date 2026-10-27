@@ -1,5 +1,5 @@
 import { mockApi } from './mock-api.js';
-import { escapeHtml as esc, icon } from './views.js';
+import { escapeHtml as esc, icon, noticeView } from './views.js';
 import { mountRounds } from './rounds.js';
 
 export function mountRecommendation(research, { setBusy, updateContract, setOutputState }) {
@@ -37,8 +37,8 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
       <button id="direct-recommend" class="primary" type="button">${icon('arrow')}直接推荐</button>
       <p class="field-description">模拟 AI 从材料原词中选取角度，采用已保存修正。</p>
       <details id="manual-recommend"><summary>我来挑关键词 <span id="selection-count" class="count">已选 0 个</span>${icon('chevron')}</summary><p class="field-description">勾选上方关键词后，仅围绕本轮所选词推荐；可分别成题，无需全部组合。</p><button id="selected-recommend" class="secondary" type="button" disabled>使用本轮选词推荐</button></details>
-      <label class="keyword-choice demo-option"><input id="empty-demo" type="checkbox"><span>演示零候选 <small>只控制本次模拟响应</small></span></label>
-      <label for="recommendation-demo">推荐演示场景</label><select id="recommendation-demo"><option value="normal">正常推荐</option><option value="model_failure">模型失败</option><option value="budget">预算拦截</option></select>
+      <div class="recommendation-demo-controls"><label for="recommendation-demo">推荐演示场景</label><select id="recommendation-demo" aria-describedby="recommendation-demo-help"><option value="normal">正常推荐</option><option value="model_failure">模型失败</option><option value="budget">预算拦截</option></select>
+      <label class="keyword-choice demo-option"><input id="empty-demo" type="checkbox"><span>演示零候选 <small id="recommendation-demo-help">只控制模拟响应，不会立即发起请求。</small></span></label></div>
     </div>
     <div id="recommendation-feedback" role="status" aria-live="polite"></div>
     <div id="recommendation-result"><p class="recommendation-idle">尚未推荐。研究和关键词已就绪，等待你点击。</p></div>`;
@@ -134,15 +134,15 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
         updateContract();
       }
       if (task.status !== 'completed') {
-        status.innerHTML = `<p class="field-error" role="alert">${esc(task.error.message)} 研究、修正、历史轮次和草稿已保留。切换演示场景后，需再次明确点击推荐。</p>`;
-        setOutputState(task.stage, 'error');
+        status.innerHTML = noticeView(`${task.error.message} 研究、修正、历史轮次和草稿已保留。切换演示场景后，需再次明确点击推荐。`, task.status === 'blocked' ? 'warning' : 'error', task.stage);
+        setOutputState(task.stage, task.status === 'blocked' ? 'warning' : 'error');
         return;
       }
       rounds.add(task.result);
       status.textContent = `模拟推荐完成 · ${task.result.candidates.length} 个候选 · 未执行知识核验`;
       setOutputState('推荐完成', 'success');
     } catch {
-      status.innerHTML = '<p class="field-error" role="alert">模拟推荐未完成，研究、修正及已有候选已保留。请再次明确点击推荐重试。</p>';
+      status.innerHTML = noticeView('模拟推荐未完成，研究、修正及已有候选已保留。请再次明确点击推荐重试。', 'error', '推荐未完成');
       setOutputState('推荐失败', 'error');
     } finally {
       running = false;

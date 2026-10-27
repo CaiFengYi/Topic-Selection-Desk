@@ -3,6 +3,19 @@ export const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g,
   (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 
 export const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+
+export function noticeView(message, tone = 'warning', title = '') {
+  return `<div class="feedback-notice ${tone}" ${tone === 'error' ? 'role="alert"' : ''}>${icon(tone === 'error' ? 'retry' : 'info')}<div>${title ? `<h3>${escapeHtml(title)}</h3>` : ''}<p>${escapeHtml(message)}</p></div></div>`;
+}
+
+function acquisitionView(acquisition) {
+  if (!acquisition) return '';
+  return `<div class="acquisition"><dl aria-label="本次取材统计">${[['检索链接', acquisition.search_links], ['可读正文', acquisition.readable], ['重复内容', acquisition.duplicates], ['读取失败', acquisition.failed]].map(([label, value]) => `<div><dt>${label}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl>${acquisition.diagnosis ? `<p class="field-description">${escapeHtml(acquisition.diagnosis)}</p>` : ''}</div>`;
+}
+
+function preservedMaterials(materials, title) {
+  return `<details class="preserved-materials"><summary>${icon('file')}<span>${escapeHtml(title)}</span><span class="count">${materials.length} 份</span>${icon('chevron')}</summary>${materials.map(materialView).join('')}</details>`;
+}
 const dateFormatter = new Intl.DateTimeFormat('zh-CN', {
   dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Hong_Kong',
 });
@@ -39,12 +52,12 @@ function materialView(material) {
 }
 
 export function researchView(result, input) {
-  if (result.status === 'no_usable_text') return `<article class="research-card"><h3>未生成研究结果</h3><div class="gap">${icon('info')}<p>${escapeHtml(result.warnings[1].message)}</p></div><p>${escapeHtml(result.gaps[0])}</p><h3>保留的材料与失败记录</h3>${result.materials.map(materialView).join('')}</article>`;
+  if (result.status === 'no_usable_text') return `<article class="research-card issue-state">${noticeView(result.warnings[1].message, 'error', '未生成研究结果')}${acquisitionView(result.acquisition)}<p class="recovery-help">${escapeHtml(result.gaps[0])}</p>${preservedMaterials(result.materials, '保留的材料与失败记录')}</article>`;
   return `<article class="research-card">
     <div class="result-heading">${icon('file')}<span>模拟研究卡</span><span class="badge success">提词完成</span></div>
     <h3 class="result-title">${escapeHtml(result.event.title)}</h3>
-    ${result.warnings.map((warning) => `<div class="${warning.code === 'MOCK_ONLY' ? 'notice' : 'gap'}">${icon('info')}<p>${escapeHtml(warning.message)} 有出处不代表事实已核实。</p></div>`).join('')}
-    ${result.acquisition ? `<p class="field-description">取材统计 · 链接 ${result.acquisition.search_links} · 可读 ${result.acquisition.readable} · 重复 ${result.acquisition.duplicates} · 失败 ${result.acquisition.failed}。${escapeHtml(result.acquisition.diagnosis)}</p>` : ''}
+    ${result.warnings.map((warning) => noticeView(`${warning.message} 有出处不代表事实已核实。`, warning.code === 'MOCK_ONLY' ? 'neutral' : 'warning')).join('')}
+    ${acquisitionView(result.acquisition)}
     <dl class="event-meta"><div><dt>事件时间 · 用户线索</dt><dd>${escapeHtml(result.event.event_time || '未知 / 未提供')}</dd></div>
     <div><dt>榜单采集时间 · 模拟</dt><dd>${escapeHtml(input.collected_at ? time(input.collected_at) : '手动输入，无榜单采集时间')}</dd></div>
     <div><dt>地点 · 用户线索</dt><dd>${escapeHtml(result.event.location || '未提供')}</dd></div>
@@ -60,10 +73,9 @@ export function researchView(result, input) {
 
 export function taskIssueView(task) {
   const clarification = task.status === 'needs_clarification';
-  return `<article class="research-card"><h3>${escapeHtml(task.stage)}</h3>
-    <div class="gap" ${clarification ? '' : 'role="alert"'}>${icon('info')}<p>${escapeHtml(clarification ? '找到两个不同的模拟事件，先确认你指哪件事。已取得材料保留，尚未提词；选择后复用材料，不补查。' : task.error.message)}</p></div>
-    ${clarification ? `<div class="clarification-actions">${task.event_candidates.map((event) => `<button class="secondary" type="button" data-event-choice="${escapeHtml(event.id)}">${escapeHtml(event.label)} · ${escapeHtml(event.source_ids.join('、'))}</button>`).join('')}<button id="add-event-clue" class="text-button" type="button">补充事件线索</button></div>` : '<p>输入已保留。可在左侧切换演示场景后明确点击「开始模拟研究」；不会自动重试。</p>'}
-    ${task.materials?.length ? `<h3>已取得材料（尚未提词）</h3>${task.materials.map(materialView).join('')}` : ''}</article>`;
+  return `<article class="research-card issue-state">${noticeView(clarification ? '找到两个不同的模拟事件，先确认你指哪件事。已取得材料保留，尚未提词；选择后复用材料，不补查。' : task.error.message, clarification || task.status === 'blocked' ? 'warning' : 'error', task.stage)}
+    ${clarification ? `<div class="clarification-actions" role="group" aria-label="选择你要研究的事件">${task.event_candidates.map((event) => `<button class="event-choice" type="button" data-event-choice="${escapeHtml(event.id)}"><span><strong>${escapeHtml(event.label)}</strong><small>对应材料 ${escapeHtml(event.source_ids.join('、'))} · 选择后继续提词</small></span>${icon('arrow')}</button>`).join('')}</div><button id="add-event-clue" class="text-button" type="button">${icon('plus')}补充事件线索</button>` : '<p class="recovery-help">输入已保留。可切换研究演示场景后明确点击「开始模拟研究」；不会自动重试。</p>'}
+    ${task.materials?.length ? preservedMaterials(task.materials, '已取得材料（尚未提词）') : ''}</article>`;
 }
 
 export function loadingView() {
