@@ -53,6 +53,19 @@
       <div class="desk">
         <section class="input-panel" aria-labelledby="input-heading">
           <div class="panel-heading"><h2 id="input-heading">研究输入</h2><span id="entry-label" class="badge neutral">手动添加</span></div>
+          <div class="demo-controls">
+            <label for="research-demo">研究演示场景</label>
+            <select id="research-demo" aria-describedby="demo-help">
+              <option value="normal">正常研究</option>
+              <option value="clarification">事件待澄清</option>
+              <option value="conflict">同事件来源分歧</option>
+              <option value="sparse">材料过少</option>
+              <option value="unreadable">读取失败 · 无可用文本</option>
+              <option value="model_failure">研究模型失败</option>
+              <option value="budget">研究预算拦截</option>
+            </select>
+            <p id="demo-help" class="field-description">仅控制下一次模拟研究。材料过少只警告，不补查、不重读、不自动重试或付费诊断。</p>
+          </div>
           <form id="research-form" novalidate>
             <div class="field-heading"><label for="title">热点标题或描述 <span class="required" aria-hidden="true">*</span></label><button type="button" id="manual" class="text-button"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>手动添加</button></div>
             <textarea id="title" name="title" rows="4" maxlength="500" required aria-describedby="title-help form-error" placeholder="你想了解哪个热点？输入标题或事件描述…"></textarea>
@@ -72,7 +85,7 @@
             <p id="form-error" class="field-error" role="alert" hidden></p>
             <div class="form-footer"><button id="submit" class="primary" type="submit"><svg class="icon" aria-hidden="true"><use href="#i-search"/></svg><span>开始模拟研究</span><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button><p>仅模拟演示，不会调用检索或模型服务。</p></div>
           </form>
-          <details class="contract"><summary><span>候选接口记录</span><span class="optional">开发参考</span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p class="field-description">仅模拟，契约待 ticket04 确认。</p><pre id="contract">尚未提交研究请求。</pre></details>
+          <details class="contract"><summary><span>候选接口记录</span><span class="optional">开发参考</span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary><p class="field-description">仅模拟，契约已于 ticket04 获用户确认。<a href="contract-examples.json" target="_blank" rel="noopener">查看各场景完整请求响应样例</a></p><pre id="contract">尚未提交研究请求。</pre></details>
         </section>
         <section class="output-panel" aria-labelledby="output-heading" aria-busy="false">
           <div class="panel-heading"><h2 id="output-heading">研究结果</h2><span id="output-state" class="badge neutral">等待输入</span></div>

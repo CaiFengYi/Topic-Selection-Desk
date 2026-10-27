@@ -1,5 +1,5 @@
 import { hotlist, mockApi, exchanges } from './mock-api.js';
-import { escapeHtml, icon, hotspotView, researchView, loadingView } from './views.js';
+import { escapeHtml, icon, hotspotView, researchView, loadingView, taskIssueView } from './views.js';
 import { mountRecommendation } from './recommendation.js';
 
 const $ = (selector) => document.querySelector(selector);
@@ -9,6 +9,8 @@ const output = $('.output-panel');
 let selectedEntry = null;
 let activePlatform = '全部';
 let busy = false;
+let pendingTask = null;
+let pendingInput = null;
 
 function renderList() {
   if (!$('#platforms').childElementCount) {
@@ -46,6 +48,7 @@ function clearValidation() {
 }
 
 function resetResult() {
+  pendingTask = null;
   $('#recommendation').hidden = true;
   $('#recommendation').replaceChildren();
   $('#recommendation-step').classList.remove('current');
@@ -138,6 +141,7 @@ function setBusy(value, label = '模拟研究中…') {
   busy = value;
   output.setAttribute('aria-busy', String(value));
   form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = value; });
+  $('#research-demo').disabled = value;
   $('#submit').innerHTML = value
     ? `<span class="spinner" aria-hidden="true"></span><span>${label}</span>`
     : `${icon('search')}<span>开始模拟研究</span>${icon('arrow')}`;
@@ -148,27 +152,41 @@ function updateContract() {
   $('#contract').textContent = JSON.stringify(exchanges, null, 2);
 }
 
-form.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  if (busy || !validateForm()) return;
-  const input = readInput();
-  resetResult();
+async function runResearch(input, resumeEvent = null) {
+  if (!resumeEvent) resetResult();
   setBusy(true);
   setStep(true);
   setOutputState('研究中', 'success');
   $('#empty').hidden = true;
   $('#result').innerHTML = loadingView();
   try {
-    exchanges.length = 0;
-    const hotspot = mockApi.createHotspot(input);
-    let task = mockApi.startResearch(hotspot.id, crypto.randomUUID());
-    while (task.status !== 'completed') {
+    let task;
+    if (resumeEvent) task = mockApi.clarifyTask(pendingTask.id, resumeEvent);
+    else {
+      exchanges.length = 0;
+      const hotspot = mockApi.createHotspot(input);
+      task = mockApi.startResearch(hotspot.id, crypto.randomUUID(), $('#research-demo').value);
+    }
+    while (['queued', 'running'].includes(task.status)) {
       $('#status').innerHTML = `<div class="progress"><div class="progress-heading"><span class="spinner" aria-hidden="true"></span><strong>${escapeHtml(task.stage)}</strong></div><p>模拟执行中，不会调用检索或模型服务。</p></div>`;
       updateContract();
       await new Promise((resolve) => setTimeout(resolve, 450));
       task = mockApi.getTask(task.id);
     }
+    if (task.status !== 'completed') {
+      pendingTask = task;
+      pendingInput = input;
+      $('#result').innerHTML = taskIssueView(task);
+      $('#status').textContent = task.stage;
+      setOutputState(task.stage, 'error');
+      return;
+    }
     $('#result').innerHTML = researchView(task.result, input);
+    if (task.result.status === 'no_usable_text') {
+      $('#status').textContent = '读取失败 · 未生成研究结果';
+      setOutputState('无可用正文', 'error');
+      return;
+    }
     mountRecommendation(task.result, { setBusy, updateContract, setOutputState });
     $('#status').innerHTML = `<div class="status-success">${icon('check')}模拟研究完成 · 未自动生成选题候选</div>`;
     setOutputState('提词完成', 'success');
@@ -180,12 +198,24 @@ form.addEventListener('submit', async (event) => {
     updateContract();
     setBusy(false);
   }
+}
+
+form.addEventListener('submit', (event) => {
+  event.preventDefault();
+  if (!busy && validateForm()) runResearch(readInput());
 });
 
 $('#status').addEventListener('click', (event) => {
   if (event.target.closest('#retry') && !busy) form.requestSubmit();
 });
 output.addEventListener('click', (event) => {
+  const choice = event.target.closest('[data-event-choice]');
+  if (choice && !busy) { runResearch(pendingInput, choice.dataset.eventChoice); return; }
+  if (event.target.closest('#add-event-clue') && !busy) {
+    $('#clues').open = true;
+    $('#location').focus();
+    return;
+  }
   const link = event.target.closest('.source-ref');
   if (!link) return;
   const material = document.getElementById(link.hash.slice(1));

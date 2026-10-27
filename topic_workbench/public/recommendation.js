@@ -38,6 +38,7 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
       <p class="field-description">模拟 AI 从材料原词中选取角度，采用已保存修正。</p>
       <details id="manual-recommend"><summary>我来挑关键词 <span id="selection-count" class="count">已选 0 个</span>${icon('chevron')}</summary><p class="field-description">勾选上方关键词后，仅围绕本轮所选词推荐；可分别成题，无需全部组合。</p><button id="selected-recommend" class="secondary" type="button" disabled>使用本轮选词推荐</button></details>
       <label class="keyword-choice demo-option"><input id="empty-demo" type="checkbox"><span>演示零候选 <small>只控制本次模拟响应</small></span></label>
+      <label for="recommendation-demo">推荐演示场景</label><select id="recommendation-demo"><option value="normal">正常推荐</option><option value="model_failure">模型失败</option><option value="budget">预算拦截</option></select>
     </div>
     <div id="recommendation-feedback" role="status" aria-live="polite"></div>
     <div id="recommendation-result"><p class="recommendation-idle">尚未推荐。研究和关键词已就绪，等待你点击。</p></div>`;
@@ -113,7 +114,7 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
     running = true;
     setBusy(true, '模拟推荐中…');
     root.setAttribute('aria-busy', 'true');
-    root.querySelectorAll('button, input, textarea').forEach((field) => { field.disabled = true; });
+    root.querySelectorAll('button, input, textarea, select').forEach((field) => { field.disabled = true; });
     rounds.lock(true);
     const status = root.querySelector('#recommendation-feedback');
     status.innerHTML = `<div class="progress-heading"><span class="spinner" aria-hidden="true"></span><strong>模拟推荐中…</strong></div><p class="field-description">只生成模拟选题，已有研究保留。未调用模型服务。</p>`;
@@ -125,12 +126,17 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
     step.classList.add('current');
     step.setAttribute('aria-current', 'step');
     try {
-      let task = mockApi.startRecommendation(research.id, { operation_id: crypto.randomUUID(), mode, keywords: chosen.map(snapshot), demo_outcome: root.querySelector('#empty-demo').checked ? 'empty' : 'normal' });
+      let task = mockApi.startRecommendation(research.id, { operation_id: crypto.randomUUID(), mode, keywords: chosen.map(snapshot), demo_outcome: root.querySelector('#empty-demo').checked ? 'empty' : 'normal', demo_failure: root.querySelector('#recommendation-demo').value });
       updateContract();
-      while (task.status !== 'completed') {
+      while (['queued', 'running'].includes(task.status)) {
         await new Promise((resolve) => setTimeout(resolve, 450));
         task = mockApi.getTask(task.id);
         updateContract();
+      }
+      if (task.status !== 'completed') {
+        status.innerHTML = `<p class="field-error" role="alert">${esc(task.error.message)} 研究、修正、历史轮次和草稿已保留。切换演示场景后，需再次明确点击推荐。</p>`;
+        setOutputState(task.stage, 'error');
+        return;
       }
       rounds.add(task.result);
       status.textContent = `模拟推荐完成 · ${task.result.candidates.length} 个候选 · 未执行知识核验`;
@@ -141,7 +147,7 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
     } finally {
       running = false;
       root.setAttribute('aria-busy', 'false');
-      root.querySelectorAll('button, input, textarea').forEach((field) => { field.disabled = false; });
+      root.querySelectorAll('button, input, textarea, select').forEach((field) => { field.disabled = false; });
       root.querySelector('#selected-recommend').disabled = !selected.size;
       rounds.lock(false);
       setBusy(false);

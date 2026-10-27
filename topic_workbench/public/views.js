@@ -28,21 +28,23 @@ function keywordView(keyword) {
 
 function materialView(material) {
   const manual = material.kind === 'manual';
-  const state = manual ? '人工补充 · 未回查' : material.status === 'duplicate' ? '重复内容 · 同一来源链' : '模拟已读正文';
+  const state = manual ? '人工补充 · 未回查' : material.status === 'failed' ? '读取失败 · 未重试' : material.status === 'duplicate' ? '重复内容 · 同一来源链' : '模拟已读正文';
   return `<details class="material" id="source-${escapeHtml(material.id)}">
     <summary>${icon('file')}<span class="material-info"><span class="material-title">${escapeHtml(material.id)} · ${escapeHtml(material.title)}</span><span class="material-state">${state}</span></span><svg class="icon chevron" aria-hidden="true"><use href="#i-chevron"/></svg></summary>
     <div class="material-body"><p>来源：${escapeHtml(material.source_url || material.source_description || '用户未说明')}</p>
     <p>发布时间：${time(material.published_at)}<br>读取时间：${time(material.read_at)}${material.submitted_at ? `<br>人工提交时间：${time(material.submitted_at)}` : ''}</p>
-    <p class="material-text">${escapeHtml(material.text)}</p>
-    <small>${manual ? '用户提供的原始文本，未访问来源、未核实。' : 'S1 与 S2 为同一虚构材料链，不能当作独立佐证。'}</small></div>
+    <p class="material-text">${escapeHtml(material.text || material.error?.message || '无正文')}</p>
+    <small>${manual ? '用户提供的原始文本，未访问来源、未核实。' : `模拟来源链：${escapeHtml(material.evidence_group || '无可用正文')}；不得由页面数量推断独立佐证。`}</small></div>
   </details>`;
 }
 
 export function researchView(result, input) {
+  if (result.status === 'no_usable_text') return `<article class="research-card"><h3>未生成研究结果</h3><div class="gap">${icon('info')}<p>${escapeHtml(result.warnings[1].message)}</p></div><p>${escapeHtml(result.gaps[0])}</p><h3>保留的材料与失败记录</h3>${result.materials.map(materialView).join('')}</article>`;
   return `<article class="research-card">
     <div class="result-heading">${icon('file')}<span>模拟研究卡</span><span class="badge success">提词完成</span></div>
     <h3 class="result-title">${escapeHtml(result.event.title)}</h3>
-    <div class="notice">${icon('info')}<p>${escapeHtml(result.warnings[0].message)} 有出处不代表事实已核实。</p></div>
+    ${result.warnings.map((warning) => `<div class="${warning.code === 'MOCK_ONLY' ? 'notice' : 'gap'}">${icon('info')}<p>${escapeHtml(warning.message)} 有出处不代表事实已核实。</p></div>`).join('')}
+    ${result.acquisition ? `<p class="field-description">取材统计 · 链接 ${result.acquisition.search_links} · 可读 ${result.acquisition.readable} · 重复 ${result.acquisition.duplicates} · 失败 ${result.acquisition.failed}。${escapeHtml(result.acquisition.diagnosis)}</p>` : ''}
     <dl class="event-meta"><div><dt>事件时间 · 用户线索</dt><dd>${escapeHtml(result.event.event_time || '未知 / 未提供')}</dd></div>
     <div><dt>榜单采集时间 · 模拟</dt><dd>${escapeHtml(input.collected_at ? time(input.collected_at) : '手动输入，无榜单采集时间')}</dd></div>
     <div><dt>地点 · 用户线索</dt><dd>${escapeHtml(result.event.location || '未提供')}</dd></div>
@@ -54,6 +56,14 @@ export function researchView(result, input) {
     <section class="result-section"><h3>所用材料 <span class="count">${result.materials.length} 份 · 含重复内容</span></h3>${result.materials.map(materialView).join('')}</section>
     <div class="stop">${icon('check')}<div><strong>研究已完成，下一步由你决定。</strong><p>可在下方修正词义或挑选关键词。只有点击推荐才会生成模拟候选。</p></div></div>
   </article>`;
+}
+
+export function taskIssueView(task) {
+  const clarification = task.status === 'needs_clarification';
+  return `<article class="research-card"><h3>${escapeHtml(task.stage)}</h3>
+    <div class="gap" ${clarification ? '' : 'role="alert"'}>${icon('info')}<p>${escapeHtml(clarification ? '找到两个不同的模拟事件，先确认你指哪件事。已取得材料保留，尚未提词；选择后复用材料，不补查。' : task.error.message)}</p></div>
+    ${clarification ? `<div class="clarification-actions">${task.event_candidates.map((event) => `<button class="secondary" type="button" data-event-choice="${escapeHtml(event.id)}">${escapeHtml(event.label)} · ${escapeHtml(event.source_ids.join('、'))}</button>`).join('')}<button id="add-event-clue" class="text-button" type="button">补充事件线索</button></div>` : '<p>输入已保留。可在左侧切换演示场景后明确点击「开始模拟研究」；不会自动重试。</p>'}
+    ${task.materials?.length ? `<h3>已取得材料（尚未提词）</h3>${task.materials.map(materialView).join('')}` : ''}</article>`;
 }
 
 export function loadingView() {

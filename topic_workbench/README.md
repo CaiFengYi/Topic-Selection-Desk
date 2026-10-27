@@ -1,4 +1,8 @@
-# 选题台：ticket01–03 本地原型
+# 选题台：ticket01–04 本地原型
+
+ticket04 已补齐七种异常演示，用户于2026-10-27确认本次交付，04已完成。研究输入上方选择正常、事件澄清、来源分歧、材料过少、读取失败、模型失败或预算拦截；推荐区保留零候选演示，并增加模型失败/预算拦截选择。修改场景本身不执行请求，再明确点击对应操作才演示。事件选择复用原任务和材料；全部网页不可读时不生成研究内容；失败保留数据、无自动重试。
+
+逐动作字段与边界见 [CONTRACT.md](CONTRACT.md)，完整浏览器操作样例见 [contract-examples.json](public/contract-examples.json)，页面「候选接口记录」可打开样例。新增14组浏览器检查、15组ticket03回归、29项离线测试通过。详见 [ticket04 验收与确认记录](../.scratch/topic-workbench/issues/04-prototype-contract-approval.md)。真实持久化、缓存、并发锁和预算保护仍须后续接入验收。
 
 实现「模拟榜单 / 手动输入 → 模拟研究 → 背景、材料与关键词 → 修正词义 / 补词 / 本轮选词 → 明确点击模拟推荐 → 换批 / 历史轮次 / 草稿编辑与多选」。支持当前页面内存快照的模拟保存与恢复，未接真实服务或持久化。
 
@@ -58,9 +62,9 @@ Get-Content topic_workbench/public/recommendation.js -Raw | node --input-type=mo
 Get-Content topic_workbench/public/rounds.js -Raw | node --input-type=module --check
 ```
 
-## 候选接口契约（未确认）
+## 接口契约（ticket04 已确认）
 
-接口由 `public/mock-api.js` 的内存适配器演示，**当前没有对应 HTTP 业务接口**。页面仅通过 HTTP GET 加载静态文件。契约待 ticket04 对照实际原型由用户确认，不能据此视为已经冻结。
+接口由 `public/mock-api.js` 的内存适配器演示，**当前没有对应 HTTP 业务接口**。页面仅通过 HTTP GET 加载静态文件。用户已在 ticket04 对照实际原型接受本次接口交付；后续真实接入以 CONTRACT.md 为依据。
 
 | 动作 | 候选请求 | 响应 |
 | --- | --- | --- |
@@ -77,7 +81,7 @@ Get-Content topic_workbench/public/rounds.js -Raw | node --input-type=module --c
 
 修正、补词与选词由页面保存于内存，适配器记录对应动作；尚无服务端状态写入。推荐发起后锁定输入和两种推荐按钮，重复点击不创建第二个操作；同一研究及 `operation_id` 复用任务。失败保留研究、修正和已有候选，不自动重试，用户可再次明确点击推荐。推荐不重新研究、不读取网页。
 
-轮次 `id` 与候选 `id` 共同定位草稿，界面中的「候选 01」只是轮内编号。草稿修改与选用保存在候选旁的页面状态 `{title, opening, selected}`，不改写原始生成字段；编辑缓冲单独保存，取消会回到最近保存版本。历史、选用列表、内存快照的查看与恢复均不发起推荐。`round_number` 仅是模拟适配器的推荐序号，不是正式费用计数；恢复界面快照不会回退适配器任务或接口记录。候选契约仍待 ticket04 用户确认。
+轮次 `id` 与候选 `id` 共同定位草稿，界面中的「候选 01」只是轮内编号。草稿修改与选用保存在候选旁的页面状态 `{title, opening, selected}`，不改写原始生成字段；编辑缓冲单独保存，取消会回到最近保存版本。历史、选用列表、内存快照的查看与恢复均不发起推荐。`round_number` 仅是模拟适配器的推荐序号，不是正式费用计数；恢复界面快照不会回退适配器任务或接口记录。用户已在 ticket04 确认本次契约。
 
 热点输入字段：`entry_kind`（hotlist / manual）、`entry_id`、`platform`、`rank`、`collected_at`、`title`、`source_url`、`location`、`event_time`、`focus`、`manual_material: {text, source_description} | null`。未知值为 null。`title` 必填，纯空白不提交。来源链接使用浏览器 URL 校验。
 
@@ -89,7 +93,7 @@ Get-Content topic_workbench/public/rounds.js -Raw | node --input-type=module --c
 - 网页材料保留正文、来源、读取状态及内容链；人工材料没有伪造读取时间，`status: unverified`。
 - 关键词保留原词、模拟词义、完整摘录、来源身份、说话者和语境。背景显示为模拟材料的来源说法，不显示事实已核实。
 - `usage: {paid_requests: 0, production_writes: 0}` 及 `mock: true` 明示原型边界；研究完成不会触发候选生成。
-- 事件澄清、材料不足及服务失败的完整契约和可操作演示属于 ticket04，本票不扩展实现。
+- 事件澄清、材料不足及服务失败已由 ticket04 补齐，完整契约及缓存边界以 [CONTRACT.md](CONTRACT.md) 为准，已获用户确认。
 
 ## 验证
 
