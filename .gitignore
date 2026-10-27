@@ -1,0 +1,5 @@
+/.env.local
+/.uv-cache/
+/validation-output/
+__pycache__/
+/workbench-data/

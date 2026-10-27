@@ -1,5 +1,28 @@
 # ticket04 候选接口与操作对照（2026-10-27 用户已确认）
 
+## ticket05 已接入的真实接口
+
+默认 `/` 为本地模式，`/?mode=demo` 保留下文模拟契约。真实服务只监听 `127.0.0.1`；Host 必须匹配实际地址端口，写操作接收 JSON，并检查同源 Origin / Fetch Metadata。无 CORS，不读取或返回模型密钥。所有响应禁用缓存。
+
+| 操作 | 请求 | 响应 |
+| --- | --- | --- |
+| 查看榜单 | `GET /api/hotlist` | `{date, items, platforms, message, mock:false}`；仅当日最近一次采集，空榜不回退示例 |
+| 仅采集刷新 | `POST /api/hotlist/refresh`，`{}` | 同上；三平台各请求一次、保存 SQLite 与来源时间，无模型、无自动重试；重叠刷新返回409 |
+| 保存热点 | `POST /api/hotspots`，下文热点输入 | 201，完整热点记录；不发起研究 |
+| 查看已保存列表 | `GET /api/hotspots` | `{hotspots:[完整热点记录]}`，按更新时间倒序 |
+| 重新打开热点 | `GET /api/hotspots/:id` | 完整热点记录；读取不发起研究 |
+| 保存输入修改 | `PATCH /api/hotspots/:id`，完整热点输入 | 同 ID 的完整热点记录，保留 created_at；不触发研究 |
+
+榜单项沿用 `id/platform/rank/title/source_url/collected_at`，新增 `platform_id/source_status/source_updated_at/mock:false`。每个平台有 `id/platform/status/collected_at/source_status/source_updated_at`；status为success/failed/missing；source_status区分success/cache/未知null。失败平台不混入旧条目，来源更新时间未知为null，不能以采集时间代替。保留平台各自的原始标题，不做语义合并。
+
+完整热点记录为 `{id,input,provenance,manual_material_submitted_at,created_at,updated_at,mock:false}`；input沿用下文已确认字段，另保留来源更新时间和缓存状态。provenance为被选榜单条目的原始快照，手动入口为null。entry_id须可回查当前榜单或该记录已有快照，平台、排名及采集时间由服务端填充，不信任浏览器伪造。人工原文与来源说明保留，提交时间独立，不表示已回查或核实。
+
+保存按钮锁定执行期间的重复点击；热点创建每次显式新建一个ID，保存修改使用PATCH。热点保存不使用付费任务的operation_id语义。研究、任务、推荐、轮次和草稿真实接口尚未接入，返回404，不接受demo开关。后续票据继续实现下文已确认语义。
+
+错误统一为 `{error:{code,message}}`：无效输入400/INVALID_INPUT；非本机同源403/LOCAL_ONLY；热点不存在404/NOT_FOUND；未接入404/NOT_IMPLEMENTED；刷新重叠409/BUSY；本地读写失败500/LOCAL_SERVICE_ERROR。响应不暴露异常堆栈或外部原始错误。保存失败页面保留输入，无自动重试。
+
+## 以下为已确认的原型契约与后续接入约定
+
 这是静态原型的候选契约，不是已上线的 HTTP API。所有业务调用在浏览器内存中执行，`mock: true`；刷新清空。真实服务、并发锁、持久化缓存与费用控制尚未验证。`demo_scenario`、`demo_outcome`、`demo_failure` 只控制夹具，真实接口不得接受这些开关。
 
 完整请求响应来自浏览器实际操作，见 [contract-examples.json](public/contract-examples.json)。页面「候选接口记录」显示当前操作的完整对象；这些记录是业务契约演示，浏览器实际网络只有静态 GET。

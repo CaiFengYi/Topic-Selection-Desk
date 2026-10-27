@@ -23,11 +23,11 @@ const time = (value) => value ? `${dateFormatter.format(new Date(value))} +08:00
 const sources = (ids) => ids.map((id) => `<a class="source-ref" href="#source-${escapeHtml(id)}" aria-label="查看材料 ${escapeHtml(id)}">${escapeHtml(id)}</a>`).join(' ');
 
 export function hotspotView(item, selected, busy) {
-  return `<button type="button" class="hotspot ${selected ? 'selected' : ''}" data-entry="${item.id}" ${busy ? 'disabled' : ''} aria-pressed="${selected}">
+  return `<button type="button" class="hotspot ${selected ? 'selected' : ''}" data-entry="${escapeHtml(item.id)}" ${busy ? 'disabled' : ''} aria-pressed="${selected}">
     <span class="rank">${String(item.rank).padStart(2, '0')}</span>
-    <span><small><span class="platform-mark">${escapeHtml(item.platform)}</span>模拟排名 ${item.rank}</small>
+    <span><small><span class="platform-mark">${escapeHtml(item.platform)}</span>${item.mock === false ? '采集排名' : '模拟排名'} ${escapeHtml(item.rank)}</small>
     <strong>${escapeHtml(item.title)}</strong>
-    <span class="hotspot-link">${selected ? '已带入研究表单' : '研究这个热点'}${icon(selected ? 'check' : 'arrow')}</span></span>
+    <span class="hotspot-link">${selected ? '已带入研究表单' : item.mock === false ? '带入热点表单' : '研究这个热点'}${icon(selected ? 'check' : 'arrow')}</span></span>
   </button>`;
 }
 

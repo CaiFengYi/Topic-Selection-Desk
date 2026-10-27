@@ -94,6 +94,10 @@ details[open] > summary > .chevron { transform: rotate(90deg); }
 .platforms button:hover { color: var(--ink); background: var(--surface); }
 .platforms button[aria-pressed="true"] { color: var(--accent); background: var(--surface); border-color: var(--line); font-weight: 600; box-shadow: 0 1px 2px #203e2c08; }
 #hotlist { display: grid; gap: var(--space-2); }
+.live-mode #hotlist { max-height: 560px; overflow-y: auto; }
+.saved-section { margin-top: var(--space-5); border-top: 1px solid var(--line); padding-top: var(--space-5); }
+#saved-hotspots { max-height: 360px; overflow-y: auto; }
+#saved-hotspots .hotspot { grid-template-columns: minmax(0, 1fr); width: 100%; }
 .hotspot { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--space-2); width: 100%; padding: var(--space-4) var(--space-3); border: 1px solid transparent; border-radius: var(--radius); background: transparent; text-align: left; }
 .hotspot:hover { background: var(--surface-muted); }
 .hotspot.selected { background: var(--accent-soft); border-color: #bdd8c7; }
