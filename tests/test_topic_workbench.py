@@ -144,7 +144,7 @@ class WorkbenchTests(unittest.TestCase):
             self.assertEqual(request('GET', '/api/hotspots', headers={'Host': 'evil.example'})[0], 403)
             self.assertEqual(request('GET', '/api/hotspots', headers={'Sec-Fetch-Site': 'same-site'})[0], 403)
             self.assertEqual(request('GET', '/.env.local')[0], 404)
-            self.assertEqual(request('POST', '/api/hotspots/x/research', {})[0], 404)
+            self.assertEqual(request('POST', '/api/hotspots/x/research', {'operation_id': str(uuid.uuid4())})[0], 404)
         finally:
             server.shutdown()
             server.server_close()

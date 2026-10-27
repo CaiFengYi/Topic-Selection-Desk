@@ -1,4 +1,4 @@
-"""Local hotlists and hotspot inputs. No research or model clients are loaded."""
+"""Local hotlists, hotspot inputs and explicit materials collection."""
 
 import json
 import os
@@ -165,6 +165,14 @@ class Workbench:
     def get_hotspot(self, hotspot_id):
         with self.store_lock:
             return read_json(self.hotspot_path(hotspot_id))
+
+    def material_tasks(self, hotspot_id):
+        from .materials import saved_tasks
+        return saved_tasks(self, hotspot_id)
+
+    def collect_materials(self, hotspot_id, body):
+        from .materials import collect
+        return collect(self, hotspot_id, body)
 
     def save_hotspot(self, value, hotspot_id=None):
         if not isinstance(value, dict):

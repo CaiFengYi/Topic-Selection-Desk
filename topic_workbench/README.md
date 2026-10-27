@@ -2,14 +2,14 @@
 
 ticket05 已接通真实本地榜单、仅采集刷新与热点记录持久化。默认打开 `http://127.0.0.1:8765/`；已确认的 ticket01–04 模拟原型移至 `http://127.0.0.1:8765/?mode=demo`，仍可演示原有研究与推荐交互。
 
-运行 `./run-topic-workbench.ps1`。服务沿用 Python 标准库，仅监听 `127.0.0.1`，静态文件根目录限于 `public/`；业务接口检查 Host、Origin 与 Fetch Metadata，不开放 CORS。不加载 `.env.local`、研究或模型客户端，不经过原版整榜 AI 入口。
+运行 `./run-topic-workbench.ps1`。服务沿用 Python 标准库，仅监听 `127.0.0.1`，静态文件根目录限于 `public/`；业务接口检查 Host、Origin 与 Fetch Metadata，不开放 CORS。页面查看、保存和榜单刷新不读取密钥、不调用收费服务；显式取材才加载 `.env.local`，不经过原版整榜 AI 入口。
 
 默认页面操作：
 
 1. 读取 `TrendRadar/output/news/当日.db` 最近一次采集的三平台榜单，按平台筛选后带入表单；无当天记录时明确显示空榜单，不回退到历史示例。
 2. 「刷新榜单 · 仅采集」显式请求公开聚合接口，每平台一次、无自动重试，复用采集器域名校验与 SQLite 存储。单个平台失败显示失败，不把该平台上次成功结果冒充当前结果。采集与来源更新时间分别显示，聚合缓存明确标记；原有数据库未记录来源更新时显示未知。
 3. 选择榜单或手动输入任意标题，可填写地点、事件时间、关注点和人工材料。点击「保存热点」仅写本地 JSON。人工原文、来源说明与提交时间保留，标注未回查；相似标题和来源差异不自动合并。
-4. 「已保存热点」重新打开记录，修改后保存更新同一 ID；页面刷新或服务重启后仍可读取。修改榜单标题后转为手动入口。保存不会启动研究或推荐；这两项按 ticket06–08 继续接入。
+4. 「已保存热点」重新打开记录，修改后保存更新同一 ID；页面刷新或服务重启后仍可读取。修改榜单标题后转为手动入口。保存不会启动研究或推荐。点击「发起研究 · 取材阶段」会自动保存当前输入并取材，无需先点保存。
 
 热点记录在 `workbench-data/hotspots/`，榜单来源时间补充在 `workbench-data/collections/`，均已忽略 Git。JSON 使用锁和临时文件替换，保存异常保留输入、无自动重试。测试可通过 `python -m topic_workbench --port 8766 --data-dir <isolated-data> --news-dir <isolated-output/news>` 隔离存储；不得借此另建收费账本。
 
@@ -129,3 +129,13 @@ ticket02 验收：13组浏览器行为检查通过，覆盖修正分离与保存
 ticket03 验收：15组浏览器检查、13组ticket02浏览器回归、29项既有离线测试及5个ES模块语法检查通过。覆盖换批不重新研究、跨轮次相同候选ID隔离、未保存编辑保留、快照恢复、失败显式重试、多选与键盘焦点；1440/1280/768/390/320宽度无页面横向溢出。桌面与手机视觉复核通过；控制台错误/警告0，网络仅本机静态GET，正式账本哈希未变。Browser plugin not available，使用现有Playwright/Chromium；未验证其他浏览器、完整读屏器、真实服务、持久化及费用控制。
 
 证据：[ticket03结果](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c90-e2c2-7a92-8c72-3118f996dd50/ticket03-qa.json)、[验收脚本](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c90-e2c2-7a92-8c72-3118f996dd50/ticket03-qa.cjs)、[02回归](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c90-e2c2-7a92-8c72-3118f996dd50/ticket02-qa.json)、[桌面](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c90-e2c2-7a92-8c72-3118f996dd50/ticket03-preview-desktop.png)、[手机](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17c90-e2c2-7a92-8c72-3118f996dd50/ticket03-preview-mobile.png)。
+
+## ticket06 取材接入
+
+默认页面可直接点击「发起研究 · 取材阶段」。复用 Runner 的 Exa 检索、正文读取、核价、账号检查、失败缓存、预算预留和 RunLock。每个输入版本最多一次搜索（5条）和一批正文（最多5页）；同一热点跨输入修改累计最多两次搜索、一批正文，失败也占次数。任意热点输入均适用，不依赖固定案例。不自动补查、重试或调用研究/推荐模型。来源链接是搜索线索，未承诺直接访问用户填写的链接；人工材料仍单独保留且不计入已读网页正文。
+
+正式费用与终端共用 `validation-output/ledger.json`，共用 `validation-output/run.lock`；即使通过 `--data-dir` 隔离热点记录，也不能新建收费账本。累计上限5元，正式调用仍需价格配置未过期、密钥存在及账号可用。结束时显示费用估算/不确定预留快照，不作为最终账单。
+
+任务存于 `workbench-data/tasks/`；原始请求、搜索结果和正文存于 `validation-output/workbench-<hotspot-id>-<input-hash>/`。同 operation_id 重放返回原任务，改变输入返回409；同热点同输入的新 operation_id 复用已有任务，包括失败，不额外请求。刷新、关闭和服务重启后重新打开热点即可只读回看正文、读取错误和取材警告。中断记录显示「尚未完成，可能仍在执行或已中断」，保留已写入的阶段材料和pending预留，不自动续跑；显式失败重试策略由后续恢复票据处理。
+
+06 的 completed 只表示取材操作结束，始终 `research_completed:false`；不会显示研究提词完成，也没有新增最终流程的强制确认步骤。关键词、推荐与后续轮次仍由07–12实现。

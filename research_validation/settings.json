@@ -1,0 +1,49 @@
+{
+  "budget_cny": 5.0,
+  "pricing": {
+    "checked_at": "2026-10-27T10:00:00+08:00",
+    "valid_until": "2026-10-28T23:59:59+08:00",
+    "usd_cny_budget_rate": 8.0,
+    "usd_cny_reference": 6.685,
+    "exa_search_usd": 0.007,
+    "exa_text_per_page_usd": 0.001,
+    "deepseek_input_per_million_cny": 2.0,
+    "deepseek_cache_hit_per_million_cny": 0.04,
+    "deepseek_output_per_million_cny": 8.0,
+    "sources": [
+      "https://exa.ai/pricing",
+      "https://api-docs.deepseek.com/zh-cn/quick_start/pricing/",
+      "https://www.boc.cn/sourcedb/whpj/"
+    ],
+    "notes": "DeepSeek uses peak prices as upper bounds, including cache misses. Exa uses an 8 CNY/USD budget reserve, above the observed BOC USD sell quote of 6.685 on 2026-10-27 09:31. Costs are estimates, not invoices; credits/tax/payment fees are not observable."
+  },
+  "cases": {
+    "brakes": {
+      "title": "懂车帝尊界制动踏板支架断裂",
+      "user_input": "懂车帝尊界刹车踏板踩断",
+      "queries": [
+        "2026年10月 懂车帝 尊界 刹车踏板 支架断裂 1612N 回应",
+        "2026年10月 尊界 制动踏板 检测说明 3000N 加载速度"
+      ],
+      "focus": "区分踏板臂、支架、底座。数字与测试条件保留原文；各方解释明确归属，不推断具体断裂原因。"
+    },
+    "fire": {
+      "title": "榆林神木问界碰撞起火",
+      "user_input": "问界M8撞击光速起火；用户确认指2026年10月17日榆林神木事故",
+      "queries": [
+        "2026年10月17日 神木 问界 碰撞起火 10月21日 说明 139.1",
+        "2026年10月 神木 问界 M9 M8 警方 回应 车辆事故"
+      ],
+      "focus": "以地点与时间定位。用户称M8，部分报道标注M9，厂商声明可能仅写问界汽车，保留差异。光速起火是用户描述。139.1km/h和起因分析注明说话者，不写成警方调查结论。"
+    },
+    "memory": {
+      "title": "内存价格出现倒挂",
+      "user_input": "用户从2026年10月27日08:00本地抖音榜单选择：内存价格出现倒挂",
+      "queries": [
+        "2026年10月 内存价格 出现倒挂 DDR4 DDR5",
+        "2026年10月 内存 价格倒挂 比较 容量 规格"
+      ],
+      "focus": "必须查明什么与什么倒挂，标明容量、代际、时间、零售或合约价等比较条件。材料不支持时留空并记录缺口，不凭常识补全，不给投资或购买建议。"
+    }
+  }
+}

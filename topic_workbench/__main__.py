@@ -7,6 +7,8 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+from research_validation.core import ValidationError
+
 from .service import Workbench
 
 
@@ -50,6 +52,10 @@ class Handler(SimpleHTTPRequestHandler):
                 self.respond({"hotspots": service.list_hotspots()})
             elif path == "/api/hotspots" and method == "POST":
                 self.respond(service.save_hotspot(body), 201)
+            elif path.startswith("/api/hotspots/") and len(path.split("/")) == 5 and path.endswith("/research") and method == "POST":
+                self.respond(service.collect_materials(path.split("/")[3], body))
+            elif path.startswith("/api/hotspots/") and len(path.split("/")) == 5 and path.endswith("/materials") and method == "GET":
+                self.respond(service.material_tasks(path.split("/")[3]))
             elif path.startswith("/api/hotspots/") and method in ("GET", "PATCH"):
                 hotspot_id = path.removeprefix("/api/hotspots/")
                 self.respond(service.get_hotspot(hotspot_id) if method == "GET" else service.save_hotspot(body, hotspot_id))
@@ -60,7 +66,9 @@ class Handler(SimpleHTTPRequestHandler):
         except FileNotFoundError:
             self.respond({"error": {"code": "NOT_FOUND", "message": "热点记录不存在"}}, 404)
         except BlockingIOError:
-            self.respond({"error": {"code": "BUSY", "message": "已有榜单采集正在执行，请稍后查看"}}, 409)
+            self.respond({"error": {"code": "BUSY", "message": "操作冲突或已有操作执行中，请稍后查看；未追加请求"}}, 409)
+        except ValidationError:
+            self.respond({"error": {"code": "BUSY", "message": "另一个付费操作正在运行，未追加请求"}}, 409)
         except Exception:
             # Do not expose filesystem paths, exception details or external responses.
             self.respond({"error": {"code": "LOCAL_SERVICE_ERROR", "message": "本地读取或保存失败，已有输入保留，请检查终端和本地数据。"}}, 500)

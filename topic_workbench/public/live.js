@@ -8,7 +8,7 @@ let selectedEntry = null;
 let savedId = null;
 let platform = '全部';
 let saving = false;
-const formatTime = (value) => value ? `${new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Hong_Kong' }).format(new Date(value))} +08:00` : '未知';
+const formatTime = (value) => value && Number.isFinite(new Date(value).getTime()) ? `${new Intl.DateTimeFormat('zh-CN', { dateStyle: 'short', timeStyle: 'medium', timeZone: 'Asia/Hong_Kong' }).format(new Date(value))} +08:00` : '未知';
 
 async function api(path, method = 'GET', body) {
   const response = await fetch(path, { method, headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -18,18 +18,19 @@ async function api(path, method = 'GET', body) {
   return result;
 }
 
-$('.mode').textContent = '本地模式 · 零模型调用';
+$('.mode').textContent = '本地模式 · 按需取材';
 $('.discovery-heading .badge').textContent = '本地榜单';
 $('.sidebar-note p').textContent = '榜单仅供定位热点，不合并相似标题或来源说法。采集时间不是事件时间。';
 $('.demo-controls').hidden = true;
 $('#submit').textContent = '保存热点';
-$('.form-footer p').textContent = '仅本地保存，不检索、不调用模型。研究与推荐尚未接入。';
+$('.form-footer p').textContent = '保存不收费。发起研究取材会调用 Exa，共用累计 5 元上限；本阶段不调用模型。';
+$('.form-footer').insertAdjacentHTML('beforeend', '<button id="collect" class="secondary" type="submit">发起研究 · 取材阶段</button>');
 $('.contract .field-description').innerHTML = '当前为真实本地接口记录。<a href="/?mode=demo">打开已确认的模拟原型</a>（演示结果仅在页面内存中）。';
 $('#contract').textContent = '等待本地接口请求。';
 $('#output-heading').textContent = '热点记录';
 $('#empty h3').textContent = '保存一个值得研究的热点。';
 $('#empty p').textContent = '从本地榜单选择，或手动填写任意热点；保存后可在下方记录中重新打开。';
-$('.empty-note').textContent = '研究、关键词与推荐将在后续接入。';
+$('.empty-note').textContent = '取材后保留正文与警告；研究提词和推荐尚未接入。';
 $('footer').innerHTML = '<span>仅本机运行 · 热点保存在本地磁盘</span><span>页面查看、热点保存与榜单刷新均不调用模型</span>';
 $('.discovery-content .muted').insertAdjacentHTML('afterend', '<button id="refresh-hotlist" class="secondary" type="button">刷新榜单 · 仅采集</button><p id="hotlist-status" class="field-description" role="status"></p>');
 $('.list-note').innerHTML = '<div id="source-times" class="field-description"></div>';
@@ -71,9 +72,9 @@ function choose(entry, record = null) {
   $('#form-error').hidden = true;
   $('#result').replaceChildren();
   $('#empty').hidden = Boolean(record);
-  $('#status').textContent = record ? '已从磁盘打开热点；未发起研究。' : '';
+  $('#status').textContent = record ? '已从磁盘打开热点，正在读取取材记录；查看不会追加请求。' : '';
   $('#output-state').textContent = record ? '已保存' : '等待保存';
-  if (record) showRecord(record);
+  if (record) { showRecord(record); loadMaterials(record.id); }
   renderList();
 }
 
@@ -81,13 +82,57 @@ function showRecord(record) {
   const input = record.input;
   $('#empty').hidden = true;
   $('#output-state').textContent = '已保存';
-  $('#result').innerHTML = `<article class="research-card"><h3 class="result-title">${esc(input.title)}</h3>${noticeView('热点输入是研究线索，不代表事件事实已核实。研究、取材与推荐尚未接入。', 'neutral')}<dl class="event-meta">${[
+  $('#result').innerHTML = `<article class="research-card"><h3 class="result-title">${esc(input.title)}</h3>${noticeView('热点输入是研究线索，不代表事件事实已核实。取材阶段不生成研究卡、关键词或推荐。', 'neutral')}<dl class="event-meta">${[
     ['入口', input.entry_kind === 'hotlist' ? `${input.platform} · 排名 ${input.rank}` : '手动添加'],
     ['榜单采集时间', formatTime(input.collected_at)], ['来源更新时间', formatTime(input.source_updated_at)],
     ['来源链接 · 未访问', input.source_url || '未提供'], ['地点 · 人工线索', input.location || '未提供'],
     ['事件时间 · 人工线索', input.event_time || '未提供'], ['关注点', input.focus || '未提供'],
     ['保存时间', formatTime(record.updated_at)],
   ].map(([label, value]) => `<div><dt>${esc(label)}</dt><dd>${esc(value)}</dd></div>`).join('')}</dl>${input.manual_material ? `<h4>人工补充材料 · 未回查</h4><p>来源说明：${esc(input.manual_material.source_description || '未提供')}</p><p>提交时间：${esc(formatTime(record.manual_material_submitted_at))}</p><p class="material-text">${esc(input.manual_material.text)}</p>` : ''}</article>`;
+}
+
+function sourceLink(url) {
+  try {
+    const parsed = new URL(url);
+    if (['https:', 'http:'].includes(parsed.protocol) && !parsed.username && !parsed.password) return `<a href="${esc(url)}" target="_blank" rel="noopener noreferrer">${esc(url)}</a>`;
+  } catch { /* Missing or invalid links remain plain text. */ }
+  return esc(url || '未提供');
+}
+
+function showMaterials(tasks) {
+  if (tasks.length) $('#output-state').textContent = '已保存 · 取材记录';
+  $('#materials-results')?.remove();
+  $('#result').insertAdjacentHTML('beforeend', `<section id="materials-results" aria-label="取材记录">${tasks.map((task) => `<article class="research-card">
+    <h3>取材阶段 · ${esc(task.input_snapshot.title)}</h3>
+    <p>${esc(({ completed: '取材结束', failed: '取材失败', blocked: '取材受阻', running: '尚未完成，可能仍在执行或已中断；不会自动续跑' })[task.status])} · 未完成研究提词</p>
+    <p class="field-description">发起：${esc(formatTime(task.created_at))} · ${task.budget ? `本次结束时共享计账/预留 ${esc(task.budget.accounted_cny)} / ${esc(task.budget.cap_cny)} 元` : '尚无结束时费用快照'}</p>
+    ${task.error ? noticeView(task.error.message, 'error') : ''}${task.warnings.map((warning) => noticeView(warning)).join('')}
+    <p>可读正文 ${task.materials.filter((s) => s.status === 'body').length} · 完全重复 ${task.materials.filter((s) => s.status === 'duplicate').length} · 读取失败 ${task.materials.filter((s) => s.status === 'read_failed').length}</p>
+    ${task.materials.map((source) => `<details class="material"><summary><span>${esc(source.id)} · ${esc(source.title)}<br>${esc(({ body: '已读正文 · 未核实', search_summary: '仅搜索结果 · 尚未读正文', duplicate: `完全重复 · 对应 ${source.duplicate_of}`, read_failed: '读取失败 · 未重试' })[source.status])}</span></summary><div class="material-body"><p>来源：${sourceLink(source.url)}</p><p>发布时间：${esc(formatTime(source.published_at))}<br>检索时间：${esc(formatTime(source.searched_at || source.retrieved_at))}<br>读取时间：${esc(formatTime(source.read_at))}</p>${source.error ? noticeView(source.error, 'error') : ''}<p class="material-text">${esc(source.text || '未取得正文')}</p>${source.summary ? `<p>搜索摘要（不是正文）：${esc(source.summary)}</p>` : ''}</div></details>`).join('')}
+    <details class="preserved-materials"><summary>原始搜索结果 · ${task.search_results.length} 条（含未读与重复链接）</summary>${task.search_results.map((source) => `<p>${esc(source.title)}<br>${sourceLink(source.url)}<br>发布时间：${esc(formatTime(source.publishedDate))}</p>`).join('') || '<p>未取得搜索结果。</p>'}</details>
+    <p class="field-description">按原始取材输入保留；未读取的来源线索和人工材料不计入已读正文。不同网站不代表独立证据链。</p>
+  </article>`).join('')}</section>`);
+}
+
+async function loadMaterials(id) {
+  try {
+    const data = await api(`/api/hotspots/${id}/materials`);
+    if (savedId === id) showMaterials(data.tasks);
+  } catch (error) { $('#status').textContent = `材料读取失败：${error.message}；未自动重试。`; }
+}
+
+async function collectMaterials() {
+  form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = true; });
+  $('.output-panel').setAttribute('aria-busy', 'true');
+  $('#status').textContent = '正在检索并读取正文；最多一次搜索与一批五页正文，不自动补查。';
+  try {
+    await api(`/api/hotspots/${savedId}/research`, 'POST', { operation_id: crypto.randomUUID() });
+    $('#status').textContent = '取材操作已结束，材料与警告已保存；尚未完成研究提词。';
+  } catch (error) { $('#status').textContent = `取材请求未完成：${error.message}。可重新打开查看已有材料，不自动重试。`; }
+  finally {
+    await loadMaterials(savedId);
+    $('.output-panel').setAttribute('aria-busy', 'false');
+  }
 }
 
 async function loadSaved() {
@@ -156,7 +201,9 @@ form.addEventListener('submit', async (event) => {
     const record = await api(savedId ? `/api/hotspots/${savedId}` : '/api/hotspots', savedId ? 'PATCH' : 'POST', input);
     savedId = record.id;
     showRecord(record);
+    await loadMaterials(record.id);
     $('#status').textContent = '热点已保存到本地磁盘，可关闭后重新打开。';
+    if (event.submitter?.id === 'collect') await collectMaterials();
     await loadSaved();
   } catch (error) { $('#status').textContent = `保存失败：${error.message} 输入已保留，未自动重试。`; }
   finally {

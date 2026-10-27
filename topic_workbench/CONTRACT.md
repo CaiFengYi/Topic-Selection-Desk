@@ -86,3 +86,13 @@
 ## 确认范围
 
 2026-10-27：用户明确回复“接受本次交付，提交”，接受正常流程、七种异常展示及本次接口交付。确认已记录在 ticket04，04完成并解除05前置阻塞；真实服务、缓存、并发锁、持久化与预算保护仍须后续实现及验收。
+
+## ticket06 已接入的取材接口
+
+- `POST /api/hotspots/:id/research`，仅接受 `{operation_id:UUID}`。本票同步执行取材，返回保存后的取材任务；不启动模型提词。`status=completed` 只表示取材结束，`kind=materials`、`research_completed=false`。失败/受阻也返回200及持久化任务的error；非法输入400、同operation输入冲突或共享进程锁忙409。暂不采用模拟版的后台队列/轮询。
+- `GET /api/hotspots/:id/materials` 返回 `{tasks:[...]}`，按创建时间倒序，纯磁盘读取。任务包含输入快照、materials、原始search_results（含未读/重复链接）、warnings、error和结束时budget快照。运行中/中断任务读取已落盘阶段文件，不触发续跑。
+- materials保留 `id/title/url/published_at/searched_at/read_at/retrieved_at/status/text/summary/error/retrieval_status`；status区分body/search_summary/duplicate/read_failed，duplicate_of仅指完全相同文本，不宣称识别所有转载链。未知发布时间为null；搜索时间、正文读取时间及人工提交时间不互代。
+- 同热点、同operation重放原任务 `reuse=operation`；不同有效输入返回409。同热点同输入的新operation复用原任务 `reuse=result_cache`，包含失败记录。改输入保留旧任务，调用次数按热点累计。重复、失败、不足均不自动追加请求。
+- 共享终端的核价、账号检查、5元账本与OS锁；锁内才构造Runner并读取账本。挂起pending请求保留全额预留并阻止同类重发。POST返回前即保存成功或失败；中途关闭浏览器不取消服务端已启动操作。
+
+本段覆盖上文「真实研究尚未接入」中取材部分；完整研究卡/任务队列、提词与推荐接口仍未接入。页面可直接发起研究取材，自动保存输入；「保存热点」仍是独立免费操作，不是研究的强制前置点击。
