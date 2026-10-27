@@ -1,5 +1,6 @@
 import { mockApi } from './mock-api.js';
 import { escapeHtml as esc, icon } from './views.js';
+import { mountRounds } from './rounds.js';
 
 export function mountRecommendation(research, { setBusy, updateContract, setOutputState }) {
   const root = document.querySelector('#recommendation');
@@ -41,6 +42,7 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
     <div id="recommendation-feedback" role="status" aria-live="polite"></div>
     <div id="recommendation-result"><p class="recommendation-idle">尚未推荐。研究和关键词已就绪，等待你点击。</p></div>`;
   root.hidden = false;
+  const rounds = mountRounds(root.querySelector('#recommendation-result'), { regenerate: recommend, updateContract });
 
   const feedback = (message) => { root.querySelector('#keyword-feedback').textContent = message; };
   root.oninput = (event) => {
@@ -86,12 +88,20 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
     updateContract();
   };
 
-  root.onclick = async (event) => {
+  root.onclick = (event) => {
     const button = event.target.closest('#direct-recommend, #selected-recommend');
-    if (!button || running) return;
-    const mode = button.id === 'direct-recommend' ? 'direct' : 'manual';
+    if (button) recommend(button.id === 'direct-recommend' ? 'direct' : 'manual');
+  };
+
+  async function recommend(mode) {
+    if (running) return;
     const chosen = keywords.filter((keyword) => mode === 'manual' ? selected.has(keyword.id) : keyword.kind !== 'manual');
-    if (!chosen.length) return;
+    if (!chosen.length) {
+      feedback('请先勾选本轮关键词，再使用人工选词方式换一批。');
+      root.querySelector('#manual-recommend').open = true;
+      root.querySelector('[data-select]')?.focus();
+      return;
+    }
     const unsaved = keywords.find((keyword) => keyword.draft.trim() !== keyword.correction);
     if (unsaved) {
       feedback('有尚未保存的词义修正。请先保存或撤销，再点击推荐。');
@@ -104,6 +114,7 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
     setBusy(true, '模拟推荐中…');
     root.setAttribute('aria-busy', 'true');
     root.querySelectorAll('button, input, textarea').forEach((field) => { field.disabled = true; });
+    rounds.lock(true);
     const status = root.querySelector('#recommendation-feedback');
     status.innerHTML = `<div class="progress-heading"><span class="spinner" aria-hidden="true"></span><strong>模拟推荐中…</strong></div><p class="field-description">只生成模拟选题，已有研究保留。未调用模型服务。</p>`;
     setOutputState('推荐中', 'success');
@@ -121,7 +132,7 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
         task = mockApi.getTask(task.id);
         updateContract();
       }
-      root.querySelector('#recommendation-result').innerHTML = candidatesView(task.result);
+      rounds.add(task.result);
       status.textContent = `模拟推荐完成 · ${task.result.candidates.length} 个候选 · 未执行知识核验`;
       setOutputState('推荐完成', 'success');
     } catch {
@@ -132,21 +143,9 @@ export function mountRecommendation(research, { setBusy, updateContract, setOutp
       root.setAttribute('aria-busy', 'false');
       root.querySelectorAll('button, input, textarea').forEach((field) => { field.disabled = false; });
       root.querySelector('#selected-recommend').disabled = !selected.size;
+      rounds.lock(false);
       setBusy(false);
       updateContract();
     }
-  };
-}
-
-function candidatesView(round) {
-  return `<section class="candidate-results" aria-labelledby="candidates-heading"><h3 id="candidates-heading">模拟选题草稿 <span class="count">${round.mode === 'direct' ? '直接推荐' : '人工选词'} · ${round.candidates.length} / 3 题</span></h3>
-    <p class="field-description">固定交互示例，未分析真实事件。编辑、选用与历史轮次由后续任务提供。</p>
-    <details class="round-snapshot"><summary>查看本次关键词与解释快照${icon('chevron')}</summary>${round.keyword_snapshot.map((keyword) => `<p><strong>${esc(keyword.term)}</strong> · ${keyword.kind === 'manual' ? '人工补词 · 未核实' : '材料原词'}<br>本轮解释：${esc(keyword.correction || keyword.meaning || '未提供')}${keyword.correction ? '<br>已采用保存的词义修正' : ''}</p>`).join('')}</details>
-    ${round.candidates.length ? round.candidates.map((candidate, index) => `<article class="candidate"><span class="badge neutral">模拟候选 ${index + 1} · 待核验</span><h4>${esc(candidate.title)}</h4><p class="candidate-opening">${esc(candidate.opening)}</p><dl>
-      <div><dt>知识问题</dt><dd>${esc(candidate.knowledge_question)}</dd></div>
-      <div><dt>所用词</dt><dd>${candidate.used_keyword_ids.map((id) => esc(round.keyword_snapshot.find((keyword) => keyword.id === id).term)).join('、')}</dd></div>
-      <div><dt>关联理由</dt><dd>${esc(candidate.association_reason)}</dd></div>
-      <div><dt>画面方向</dt><dd>${esc(candidate.visual_direction)}</dd></div>
-      <div><dt>待查证点</dt><dd><ul>${candidate.verification_points.map((point) => `<li>${esc(point)}</li>`).join('')}</ul></dd></div></dl></article>`).join('') : `<div class="gap">${icon('info')}<div><strong>本轮没有合适候选</strong><p>${esc(round.empty_reason)}</p></div></div>`}
-    </section>`;
+  }
 }

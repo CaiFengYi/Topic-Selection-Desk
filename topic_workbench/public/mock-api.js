@@ -13,6 +13,7 @@ const fixtures = {
 const tasks = new Map();
 const hotspots = new Map();
 const operations = new Map();
+const recommendationCounts = new Map();
 export const exchanges = [];
 
 function record(method, path, request, response) {
@@ -69,10 +70,15 @@ export const mockApi = {
   selectKeywords(researchId, keywordIds) {
     return record('PUT', `/api/research/${researchId}/selection`, { keyword_ids: keywordIds }, { keyword_ids: keywordIds, mock: true });
   },
+  saveDraft(roundId, draftId, changes) {
+    return record('PATCH', `/api/rounds/${roundId}/drafts/${draftId}`, changes, { round_id: roundId, draft_id: draftId, ...changes, mock: true });
+  },
   startRecommendation(researchId, input) {
     const key = `recommendation:${researchId}:${input.operation_id}`;
     if (operations.has(key)) return structuredClone(operations.get(key));
-    const task = { id: `task-${crypto.randomUUID()}`, kind: 'recommendation', research_id: researchId, operation_id: input.operation_id, mock: true, status: 'queued', stage: '等待模拟推荐', snapshot: structuredClone(input), result: null };
+    const roundNumber = (recommendationCounts.get(researchId) || 0) + 1;
+    recommendationCounts.set(researchId, roundNumber);
+    const task = { id: `task-${crypto.randomUUID()}`, kind: 'recommendation', research_id: researchId, round_number: roundNumber, operation_id: input.operation_id, mock: true, status: 'queued', stage: '等待模拟推荐', snapshot: structuredClone(input), result: null };
     tasks.set(task.id, { task, started: performance.now() });
     operations.set(key, task);
     return record('POST', `/api/research/${researchId}/recommendations`, input, task);
@@ -93,7 +99,7 @@ function recommendationFor(task) {
   const snapshot = structuredClone(task.snapshot);
   const candidates = snapshot.demo_outcome === 'empty' ? [] : snapshot.keywords.slice(0, 3).map((keyword, index) => {
     const [title, question, visual] = angles[keyword.term] || [`如何研究「${keyword.term}」？`, `「${keyword.term}」可以转化成什么可独立验证的问题？`, '用问题、条件、观察三栏画出验证路径；这是通用交互模板。'];
-    return { id: `${task.id}-draft-${index + 1}`, title, opening: `从「${keyword.term}」出发，先提出一个独立的知识问题：${question}`, knowledge_question: question, used_keyword_ids: [keyword.id], association_reason: `沿用本轮解释「${keyword.correction || keyword.meaning || '用户提供的创作线索'}」作为创作线索；${keyword.correction ? '词义已修正，原示例角度需据此复核。' : '与该词分别成题。'}不据此判断具体事件。`, visual_direction: visual, verification_points: ['核验知识问题的概念、适用条件与演示安全性。', '核验标题、开场及本轮解释是否相符；模拟示例不代表已完成内容推理。'] };
+    return { id: `${task.id}-draft-${index + 1}`, title: task.round_number % 2 === 0 ? question : title, opening: task.round_number % 2 === 0 ? `换个提问方式，从观察条件开始：${question}` : `从「${keyword.term}」出发，先提出一个独立的知识问题：${question}`, knowledge_question: question, used_keyword_ids: [keyword.id], association_reason: `沿用本轮解释「${keyword.correction || keyword.meaning || '用户提供的创作线索'}」作为创作线索；${keyword.correction ? '词义已修正，原示例角度需据此复核。' : '与该词分别成题。'}不据此判断具体事件。`, visual_direction: visual, verification_points: ['核验知识问题的概念、适用条件与演示安全性。', '核验标题、开场及本轮解释是否相符；模拟示例不代表已完成内容推理。'] };
   });
   return { id: `round-${task.id}`, research_id: task.research_id, mock: true, mode: snapshot.mode, keyword_snapshot: snapshot.keywords, candidates, empty_reason: candidates.length ? null : '本次选择了零候选演示：模拟材料不足以支撑独立的知识问题，保留研究与选词，不为凑数生成选题。可补充或调整关键词后明确点击推荐。', usage: { paid_requests: 0, production_writes: 0 } };
 }
