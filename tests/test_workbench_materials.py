@@ -189,7 +189,9 @@ class MaterialsTests(unittest.TestCase):
         try:
             self.assertEqual(request('POST', base + '/research', {**self.operation, 'demo_scenario': 'normal'})[0], 400)
             self.assertEqual(request('POST', base + '/research', self.operation, 'https://evil.example')[0], 403)
-            status, task = request('POST', base + '/research', self.operation)
+            # This endpoint now continues into ticket07 after collection.
+            with patch('topic_workbench.research.run', side_effect=lambda service, task: task):
+                status, task = request('POST', base + '/research', self.operation)
             self.assertEqual(status, 200)
             self.assertEqual(task['status'], 'completed')
             self.assertEqual(request('GET', base + '/materials')[1]['tasks'][0]['id'], task['id'])

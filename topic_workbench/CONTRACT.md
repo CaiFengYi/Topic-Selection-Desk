@@ -96,3 +96,14 @@
 - 共享终端的核价、账号检查、5元账本与OS锁；锁内才构造Runner并读取账本。挂起pending请求保留全额预留并阻止同类重发。POST返回前即保存成功或失败；中途关闭浏览器不取消服务端已启动操作。
 
 本段覆盖上文「真实研究尚未接入」中取材部分；完整研究卡/任务队列、提词与推荐接口仍未接入。页面可直接发起研究取材，自动保存输入；「保存热点」仍是独立免费操作，不是研究的强制前置点击。
+
+## ticket07 已接入的研究接口（覆盖06的取材阶段终点）
+
+- `POST /api/hotspots/:id/research` 仍仅接受 `{operation_id:UUID}`，同步取材后自动研究，返回 `kind=research` 的任务；不再以取材任务作为本接口终点。取材记录仍独立保留，`GET /api/hotspots/:id/materials` 继续可读。未建立后台队列；完成返回前已保存，浏览器关闭不取消服务端工作。
+- `GET /api/hotspots/:id/research` 返回 `{tasks:[...]}`；`GET /api/tasks/:id` 返回单个研究任务。纯磁盘读取，绝不自动执行。任务保留06身份、输入快照、材料、警告和预算字段，新增 `kind:research/result/event_candidates/selected_event/research_completed`。running读取只表示尚未完成，可能执行中或中断，不自动续跑。
+- 状态为 `running/completed/needs_clarification/failed/blocked`。仅有候选事件时 result=null、research_completed=false；`PATCH /api/tasks/:id/event` 仅接受 `{event_id}`，仅限该任务已保存的候选，用其 source_ids 对材料过滤后继续提词。重复选同事件返回原任务；改选其他事件409，未知候选400，不搜索、不读新网页。同事件来源分歧使用带speaker及source_ids的disputed背景，不进入此暂停分支。
+- result为 `{id,task_id,hotspot_id,status,event,background,keywords,evidence_groups,gaps,...}`，沿用现有Runner研究结构：event含name/time/location/identity_notes；background含text/source_ids/status/speaker；keyword含id/term/meaning/source_id/quote/stance/speaker/concepts。连续引文须包含原词且出现在引用材料中，最长160字；stance为neutral/affirmed/denied/disputed/attributed，否定与一方说法须有speaker。材料链不是真假判断，concepts为联想，不冒充原词。研究成功不自动推荐。
+- `result.status=no_usable_text` 时没有背景、词和材料分组，research_completed=false且不调用模型；有可引用文本时允许在材料偏少警告下研究，keywords为空则status=insufficient。人工来源 `id=M1/kind=manual/status=manual`，保留text/source_description/submitted_at，read_at与published_at为null，校验其用户提交原文，不声称系统已读网页。全部网页不可读但有人工文本时可以仅研究人工文本。
+- 研究沿用原正式账本和OS锁，模型也按热点累计计次。每热点研究最多四次（含失败与事件选择）；每条模型路径检查pending、核价、账号和预算后预留费用。失败或预留不清不自动重发；同operation、同输入重放包含失败及澄清结果。研究错误code为BUDGET_BLOCKED（付费保护受阻）/RESEARCH_STOPPED（模型或引用检查失败）/MODEL_FAILED（未完成），已有材料保留，错误不暴露外部敏感细节。
+
+推荐、词义修改、选择、轮次与草稿真实接口仍由08–11接入。本票未验证正式收费服务的语义质量；事件划分、说法归属及引文语境仍需人工审核，逐字校验不等于事实核验。

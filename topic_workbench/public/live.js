@@ -1,4 +1,5 @@
 import { escapeHtml as esc, hotspotView, noticeView } from './views.js';
+import { researchTasksView } from './research.js';
 
 const $ = (selector) => document.querySelector(selector);
 document.documentElement.classList.add('live-mode');
@@ -18,19 +19,19 @@ async function api(path, method = 'GET', body) {
   return result;
 }
 
-$('.mode').textContent = '本地模式 · 按需取材';
+$('.mode').textContent = '本地模式 · 研究提词';
 $('.discovery-heading .badge').textContent = '本地榜单';
 $('.sidebar-note p').textContent = '榜单仅供定位热点，不合并相似标题或来源说法。采集时间不是事件时间。';
 $('.demo-controls').hidden = true;
 $('#submit').textContent = '保存热点';
-$('.form-footer p').textContent = '保存不收费。发起研究取材会调用 Exa，共用累计 5 元上限；本阶段不调用模型。';
-$('.form-footer').insertAdjacentHTML('beforeend', '<button id="collect" class="secondary" type="submit">发起研究 · 取材阶段</button>');
+$('.form-footer p').textContent = '保存不收费。发起研究会取材并调用 DeepSeek 提词，共用累计 5 元上限；完成后等待推荐操作。';
+$('.form-footer').insertAdjacentHTML('beforeend', '<button id="collect" class="secondary" type="submit">发起研究</button>');
 $('.contract .field-description').innerHTML = '当前为真实本地接口记录。<a href="/?mode=demo">打开已确认的模拟原型</a>（演示结果仅在页面内存中）。';
 $('#contract').textContent = '等待本地接口请求。';
 $('#output-heading').textContent = '热点记录';
 $('#empty h3').textContent = '保存一个值得研究的热点。';
 $('#empty p').textContent = '从本地榜单选择，或手动填写任意热点；保存后可在下方记录中重新打开。';
-$('.empty-note').textContent = '取材后保留正文与警告；研究提词和推荐尚未接入。';
+$('.empty-note').textContent = '取材后自动接续研究提词，保留出处与缺口；不会自动推荐。';
 $('footer').innerHTML = '<span>仅本机运行 · 热点保存在本地磁盘</span><span>页面查看、热点保存与榜单刷新均不调用模型</span>';
 $('.discovery-content .muted').insertAdjacentHTML('afterend', '<button id="refresh-hotlist" class="secondary" type="button">刷新榜单 · 仅采集</button><p id="hotlist-status" class="field-description" role="status"></p>');
 $('.list-note').innerHTML = '<div id="source-times" class="field-description"></div>';
@@ -82,7 +83,7 @@ function showRecord(record) {
   const input = record.input;
   $('#empty').hidden = true;
   $('#output-state').textContent = '已保存';
-  $('#result').innerHTML = `<article class="research-card"><h3 class="result-title">${esc(input.title)}</h3>${noticeView('热点输入是研究线索，不代表事件事实已核实。取材阶段不生成研究卡、关键词或推荐。', 'neutral')}<dl class="event-meta">${[
+  $('#result').innerHTML = `<article class="research-card"><h3 class="result-title">${esc(input.title)}</h3>${noticeView('热点输入是研究线索，不代表事件事实已核实。保存不会发起研究或推荐。', 'neutral')}<dl class="event-meta">${[
     ['入口', input.entry_kind === 'hotlist' ? `${input.platform} · 排名 ${input.rank}` : '手动添加'],
     ['榜单采集时间', formatTime(input.collected_at)], ['来源更新时间', formatTime(input.source_updated_at)],
     ['来源链接 · 未访问', input.source_url || '未提供'], ['地点 · 人工线索', input.location || '未提供'],
@@ -118,16 +119,22 @@ async function loadMaterials(id) {
   try {
     const data = await api(`/api/hotspots/${id}/materials`);
     if (savedId === id) showMaterials(data.tasks);
+    const research = await api(`/api/hotspots/${id}/research`);
+    if (savedId === id) {
+      $('#research-results')?.remove();
+      $('#materials-results').insertAdjacentHTML('beforebegin', researchTasksView(research.tasks));
+      if (research.tasks.length) $('#output-state').textContent = '已保存 · 研究记录';
+    }
   } catch (error) { $('#status').textContent = `材料读取失败：${error.message}；未自动重试。`; }
 }
 
 async function collectMaterials() {
   form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = true; });
   $('.output-panel').setAttribute('aria-busy', 'true');
-  $('#status').textContent = '正在检索并读取正文；最多一次搜索与一批五页正文，不自动补查。';
+  $('#status').textContent = '正在取材并研究提词；材料偏少不追加检索，事件不清时暂停选择。';
   try {
     await api(`/api/hotspots/${savedId}/research`, 'POST', { operation_id: crypto.randomUUID() });
-    $('#status').textContent = '取材操作已结束，材料与警告已保存；尚未完成研究提词。';
+    $('#status').textContent = '研究操作已保存，请查看结果、事件选择或失败说明；不会自动推荐。';
   } catch (error) { $('#status').textContent = `取材请求未完成：${error.message}。可重新打开查看已有材料，不自动重试。`; }
   finally {
     await loadMaterials(savedId);
@@ -146,6 +153,38 @@ async function loadSaved() {
 $('#platforms').addEventListener('click', (event) => {
   const button = event.target.closest('[data-platform]');
   if (button) { platform = button.dataset.platform; renderList(); }
+});
+
+$('#result').addEventListener('click', async (event) => {
+  const reference = event.target.closest('a.source-ref');
+  if (reference) {
+    const target = document.getElementById(reference.hash.slice(1));
+    for (let parent = target; parent; parent = parent.parentElement) {
+      if (parent.tagName === 'DETAILS') parent.open = true;
+    }
+  }
+  const clue = event.target.closest('[data-add-clue]');
+  if (clue && !saving) {
+    form.elements.location.closest('details')?.setAttribute('open', '');
+    form.elements.location.focus();
+    return;
+  }
+  const button = event.target.closest('[data-task-event]');
+  if (!button || saving) return;
+  saving = true;
+  const id = savedId;
+  form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = true; });
+  $('#result').querySelectorAll('[data-task-event], [data-add-clue]').forEach((b) => { b.disabled = true; });
+  $('#status').textContent = '复用已取得材料研究所选事件，不追加取材。';
+  try {
+    await api(`/api/tasks/${button.dataset.taskEvent}/event`, 'PATCH', { event_id: button.dataset.eventId });
+    $('#status').textContent = '所选事件研究操作已保存；不会自动推荐。';
+  } catch (error) { $('#status').textContent = `事件研究未完成：${error.message}；未自动重试。`; }
+  finally {
+    await loadMaterials(id);
+    saving = false;
+    form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = false; });
+  }
 });
 $('#hotlist').addEventListener('click', (event) => {
   const button = event.target.closest('[data-entry]');

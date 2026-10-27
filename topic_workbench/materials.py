@@ -46,6 +46,7 @@ def collect(workbench, hotspot_id, body):
             return {**prior, "reuse": "result_cache"}
         task = {"id": task_id, "hotspot_id": hotspot_id, "operation_id": operation_id,
                 "input_hash": identity, "input_snapshot": snapshot, "kind": "materials",
+                "manual_material_submitted_at": record["manual_material_submitted_at"],
                 "status": "running", "stage": "取材", "created_at": now(),
                 "materials": [], "search_results": [], "warnings": [], "error": None,
                 "research_completed": False, "mock": False, "reuse": "none"}

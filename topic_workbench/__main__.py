@@ -53,7 +53,17 @@ class Handler(SimpleHTTPRequestHandler):
             elif path == "/api/hotspots" and method == "POST":
                 self.respond(service.save_hotspot(body), 201)
             elif path.startswith("/api/hotspots/") and len(path.split("/")) == 5 and path.endswith("/research") and method == "POST":
-                self.respond(service.collect_materials(path.split("/")[3], body))
+                from .research import start
+                self.respond(start(service, path.split("/")[3], body))
+            elif path.startswith("/api/hotspots/") and len(path.split("/")) == 5 and path.endswith("/research") and method == "GET":
+                from .research import saved_tasks
+                self.respond(saved_tasks(service, path.split("/")[3]))
+            elif path.startswith("/api/tasks/") and len(path.split("/")) == 4 and method == "GET":
+                from .research import get_task
+                self.respond(get_task(service, path.split("/")[3]))
+            elif path.startswith("/api/tasks/") and len(path.split("/")) == 5 and path.endswith("/event") and method == "PATCH":
+                from .research import select_event
+                self.respond(select_event(service, path.split("/")[3], body))
             elif path.startswith("/api/hotspots/") and len(path.split("/")) == 5 and path.endswith("/materials") and method == "GET":
                 self.respond(service.material_tasks(path.split("/")[3]))
             elif path.startswith("/api/hotspots/") and method in ("GET", "PATCH"):

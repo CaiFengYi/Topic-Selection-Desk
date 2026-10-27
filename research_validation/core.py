@@ -125,11 +125,11 @@ def require_text(value, label):
         raise ValidationError(f"缺少有效文本：{label}")
 
 
-def check_research(data, sources, case):
+def check_research(data, sources, case, minimum_bodies=2):
     if not isinstance(data, dict):
         raise ValidationError("研究输出必须为JSON对象。")
     bodies = {s["id"]: s for s in sources if s["status"] == "body"}
-    if len(bodies) < 2:
+    if len(bodies) < minimum_bodies:
         raise ValidationError("不足两份可读正文。")
 
     def refs(ids):

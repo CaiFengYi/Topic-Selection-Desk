@@ -226,7 +226,7 @@ class Runner:
         input_bound = len(json.dumps(messages, ensure_ascii=False).encode("utf-8")) + 2048
         reserve = (input_bound*p["deepseek_input_per_million_cny"] +
                    max_tokens*p["deepseek_output_per_million_cny"]) / 1_000_000
-        entry = self.ledger.reserve(case, stage, reserve)
+        entry = self.ledger.reserve(self.case_scope or case, stage, reserve)
         started = time.monotonic()
         try:
             # Explicit SDK client also disables retries below LiteLLM.
