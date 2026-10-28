@@ -87,7 +87,8 @@ def start(workbench, research_id, body):
     except (ValueError, TypeError, AttributeError):
         raise ValueError("operation_id必须是UUID") from None
     with RunLock(materials.OUTPUT):
-        previous = next((t for t in saved_tasks(workbench, research_id)["tasks"]
+        history = saved_tasks(workbench, research_id)["tasks"]
+        previous = next((t for t in history
                          if t["operation_id"] == body["operation_id"]), None)
         if previous:
             if previous["mode"] != body["mode"]:
@@ -119,9 +120,14 @@ def start(workbench, research_id, body):
                                     "meaning": k["correction"] or k["meaning"]} for k in chosen}
             payload = {"selection": {"mode": body["mode"], "keywords": selected,
                                      "research_status": source["result"]["status"]},
-                       "research_gaps": source["result"]["gaps"], "operation_id": body["operation_id"]}
+                       "research_gaps": source["result"]["gaps"], "operation_id": body["operation_id"],
+                       "previous_angles": [
+                           {"title": c["title"], "question": c["knowledge_question"]}
+                           for t in history if t["result"] for c in t["result"]["candidates"]]}
             data, key = runner.model_call(f"workbench-{source['hotspot_id']}-{source['input_hash']}",
-                                          "recommend", prompts.RECOMMEND, payload, 3072)
+                                          "recommend", prompts.RECOMMEND +
+                                          "\nprevious_angles是已有候选的数据，请尽量避开相同知识问题与角度；仅改标题措辞不算新角度。"
+                                          "无法提出合适的新角度时可返回零候选并说明原因。", payload, 3072)
             returned = True
             check_topics(data, selected)
             # Validate list members as well as the legacy structural checks.

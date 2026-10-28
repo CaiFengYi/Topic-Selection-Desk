@@ -120,6 +120,64 @@ class RecommendationTests(unittest.TestCase):
         self.model.return_value = self.response({'topics': [], 'reason': ''})
         self.assertEqual(self.start()['status'], 'failed')
 
+    def test_new_batch_avoids_saved_angles_uses_current_selection_and_survives_restart(self):
+        first = self.start()
+        manual = self.edit('manual', {'term': '踏板', 'meaning': '创作线索'})['keywords'][-1]
+        self.edit('selection', {'keyword_ids': [manual['id']]})
+        self.edit('correction', {'correction': '当前解释'}, manual['id'])
+        self.model.return_value = self.response(topics((manual['id'],), ('踏板',)))
+        second = self.start('manual')
+        payload = json.loads(self.model.call_args.kwargs['messages'][1]['content'])
+        self.assertEqual(payload['previous_angles'], [{'title': first['result']['candidates'][0]['title'],
+                                                      'question': first['result']['candidates'][0]['knowledge_question']}])
+        self.assertEqual(list(payload['selection']['keywords']), [manual['id']])
+        self.assertEqual(payload['selection']['keywords'][manual['id']]['meaning'], '当前解释')
+        self.assertNotEqual(first['result']['input_hash'], second['result']['input_hash'])
+        self.assertEqual(self.model.call_count, 2)
+        self.search.assert_not_called()
+        self.service = Workbench(self.service.data_dir)
+        self.edit('correction', {'correction': '后续解释'}, manual['id'])
+        saved = rec.saved_tasks(self.service, self.rid)['tasks']
+        self.assertEqual(saved, [first, second])
+        self.assertEqual(saved[1]['keyword_snapshot'][0]['correction'], '当前解释')
+        self.assertEqual(self.start(body={'operation_id': second['operation_id'], 'mode': 'manual'})['id'], second['id'])
+        self.assertEqual(self.model.call_count, 2)
+
+    def test_budget_after_success_keeps_history_without_model_or_retrieval(self):
+        first = self.start()
+        ledger = Ledger(self.output / 'ledger.json')
+        ledger.reserve('other', 'research', ledger.cap - ledger.total)
+        blocked = self.start()
+        self.assertEqual(blocked['status'], 'blocked')
+        self.assertEqual(rec.saved_tasks(self.service, self.rid)['tasks'][0], first)
+        self.assertEqual(self.model.call_count, 1)
+        self.search.assert_not_called()
+
+    def test_simultaneous_same_operation_charges_once(self):
+        body = {'operation_id': str(uuid.uuid4()), 'mode': 'direct'}
+        entered, release = threading.Event(), threading.Event()
+
+        def response(**kwargs):
+            entered.set()
+            self.assertTrue(release.wait(10))
+            return self.response(topics())
+
+        self.model.side_effect = response
+        results = []
+        worker = threading.Thread(target=lambda: results.append(self.start(body=body)))
+        worker.start()
+        try:
+            self.assertTrue(entered.wait(10))
+            with self.assertRaises(ValidationError):
+                self.start(body=body)
+        finally:
+            release.set()
+            worker.join(10)
+        self.assertEqual(results[0]['status'], 'completed')
+        self.assertEqual(self.start(body=body)['id'], results[0]['id'])
+        self.assertEqual(self.model.call_count, 1)
+        self.assertEqual(len(Ledger(self.output / 'ledger.json').data['entries']), 1)
+
     def test_bad_outputs_never_replace_saved_success(self):
         original = self.start()
         invalid = []

@@ -4,6 +4,7 @@ export async function mountLiveRecommendation(root, research, { api, setBusy }) 
   const base = `/api/research/${research.id}`;
   let state = await api(`${base}/keywords`);
   let tasks = (await api(`${base}/recommendations`)).tasks;
+  let activeId = tasks.filter((t) => t.result).at(-1)?.id;
   let busy = false;
 
   const candidateView = (candidate, round) => `<article class="candidate">
@@ -21,12 +22,16 @@ export async function mountLiveRecommendation(root, research, { api, setBusy }) 
 
   function renderResults() {
     const latest = tasks.at(-1);
-    const result = tasks.filter((t) => t.result).at(-1)?.result;
+    const rounds = tasks.filter((t) => t.result);
+    const result = rounds.find((t) => t.id === activeId)?.result;
     root.querySelector('[data-recommendation-results]').innerHTML = `
       ${latest?.error ? noticeView(latest.error.message, 'error') : ''}
       ${latest?.status === 'running' ? noticeView('推荐尚未完成，可能执行中或已中断；不会自动重试。') : ''}
       ${latest?.budget ? `<p class="field-description">本阶段共享计账 / 预留 ${esc(latest.budget.accounted_cny)} / ${esc(latest.budget.cap_cny)} 元；应用估算，不是账户账单。</p>` : ''}
-      ${result ? `<h3>已保存候选 · ${result.candidates.length} / 3 题</h3>
+      ${result ? `<nav class="round-history" aria-label="历史推荐轮次">${rounds.map((t, i) => `<button class="secondary" type="button" data-round="${esc(t.id)}" aria-pressed="${t.id === activeId}">第 ${i + 1} 轮 · ${t.mode === 'direct' ? '直接' : '人工'} · ${t.result.candidates.length} 题</button>`).join('')}</nav>
+        <div class="round-actions"><button class="secondary" type="button" data-next-batch data-recommend="${esc(result.mode)}">换一批 · 消耗模型额度</button>
+        <p class="field-description">沿用当前查看轮次的推荐方式与上方当前选词、已保存修正；只调用一次推荐模型，尽量避开已有角度，不重新检索或读取正文。查看历史与刷新免费。</p></div>
+        <h3>第 ${rounds.findIndex((t) => t.id === activeId) + 1} 轮已保存候选 · ${result.candidates.length} / 3 题</h3>
         ${noticeView('结构与原词引用检查通过；不表示科学内容、实验数据或事件事实已核验。请检查原物件与数字辨识度、独立知识问题和待查证事项。', 'neutral')}
         <details class="round-snapshot"><summary>本次关键词与解释快照 · ${result.mode === 'direct' ? '直接推荐' : '人工推荐'}</summary>${result.keyword_snapshot.map((k) => `<p><strong>${esc(k.term)}</strong> · ${k.kind === 'manual' ? '人工补词，未核实' : '材料原词'}<br>本轮解释：${esc(k.correction || k.meaning || '未提供')}<br>原 AI 解释 / 补词说明：${esc(k.meaning || '未提供')}</p>`).join('')}</details>
         ${result.candidates.length ? result.candidates.map((c) => candidateView(c, result)).join('') : noticeView(`本轮没有合适候选：${result.empty_reason}`)}` : '<p class="recommendation-idle">尚无已完成的推荐，等待你明确点击。</p>'}`;
@@ -60,6 +65,8 @@ export async function mountLiveRecommendation(root, research, { api, setBusy }) 
     root.querySelectorAll('button, input, textarea').forEach((e) => { e.disabled = value; });
     root.querySelector('[data-recommend="manual"]').disabled = value || !state.keyword_ids.length;
     root.querySelector('[data-recommend="direct"]').disabled = value || !state.keywords.some((k) => k.kind === 'original');
+    const next = root.querySelector('[data-next-batch]');
+    if (next) next.disabled = value || (next.dataset.recommend === 'manual' ? !state.keyword_ids.length : !state.keywords.some((k) => k.kind === 'original'));
   }
   const feedback = (message) => { root.querySelector('[data-feedback]').textContent = message; };
   async function save(action) {
@@ -93,6 +100,14 @@ export async function mountLiveRecommendation(root, research, { api, setBusy }) 
     finally { lock(false); }
   });
   root.addEventListener('click', async (event) => {
+    const round = event.target.closest('[data-round]');
+    if (round && !busy) {
+      activeId = round.dataset.round;
+      renderResults();
+      lock(false);
+      root.querySelector(`[data-round="${activeId}"]`).focus();
+      return;
+    }
     const button = event.target.closest('[data-recommend]');
     if (!button || busy) return;
     const unsaved = [...root.querySelectorAll('[data-correction]')].some((form) => form.querySelector('textarea').value.trim() !== (state.keywords.find((k) => k.id === form.dataset.correction).correction || ''));
@@ -103,6 +118,7 @@ export async function mountLiveRecommendation(root, research, { api, setBusy }) 
     try {
       const task = await api(`${base}/recommendations`, 'POST', { operation_id: crypto.randomUUID(), mode: button.dataset.recommend });
       tasks.push(task);
+      if (task.result) activeId = task.id;
       renderResults();
       feedback(task.status === 'completed' ? '推荐已保存，内容等待人工审核与知识核验。' : '操作已保存，请查看失败或受阻说明。');
     } catch (error) { feedback(`请求未完成：${error.message}；已有结果保留。重新打开热点可只读检查，不自动重试。`); }
