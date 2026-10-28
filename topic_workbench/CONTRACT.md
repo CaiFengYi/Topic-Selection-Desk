@@ -107,3 +107,27 @@
 - 研究沿用原正式账本和OS锁，模型也按热点累计计次。每热点研究最多四次（含失败与事件选择）；每条模型路径检查pending、核价、账号和预算后预留费用。失败或预留不清不自动重发；同operation、同输入重放包含失败及澄清结果。研究错误code为BUDGET_BLOCKED（付费保护受阻）/RESEARCH_STOPPED（模型或引用检查失败）/MODEL_FAILED（未完成），已有材料保留，错误不暴露外部敏感细节。
 
 推荐、词义修改、选择、轮次与草稿真实接口仍由08–11接入。本票未验证正式收费服务的语义质量；事件划分、说法归属及引文语境仍需人工审核，逐字校验不等于事实核验。
+
+## ticket08 已接入的词义、选择与推荐接口（覆盖上文相应未实现说明）
+
+以下均为真实本地接口，继续使用同源保护与JSON大小限制；不接受demo参数。研究必须已完成，允许研究关键词为空时添加并选择人工补词。免费操作不加载模型客户端或密钥、不创建费用条目。
+
+| 操作 | 请求 | 响应 |
+| --- | --- | --- |
+| 读取关键词及本轮选择 | `GET /api/research/:id/keywords` | `{keywords,keyword_ids,mock:false}` |
+| 保存 / 撤销修正 | `PATCH /api/research/:id/keywords/:kid`，`{correction:string或null}` | 同上；空白视为撤销，仅修正解释 |
+| 人工补词 | `POST /api/research/:id/keywords`，`{term,meaning}` | 同上；term非空且不超过100字，meaning可空且不超过1000字；新词默认未选 |
+| 保存本轮选择 | `PUT /api/research/:id/selection`，`{keyword_ids:[...]}` | 同上；允许清空，拒绝未知或重复ID |
+| 显式推荐 | `POST /api/research/:id/recommendations`，`{operation_id:UUID,mode:direct或manual}` | 同步执行并保存推荐任务；失败和拦截也返回200及任务error |
+| 读取推荐记录 | `GET /api/research/:id/recommendations` | `{tasks:[...]}`，按创建时间排列，纯磁盘读取 |
+| 查询推荐任务 | `GET /api/tasks/:id` | 原推荐任务，纯读取；与研究任务共用查询入口 |
+
+真实POST不接受原型中客户端提供的`keywords`快照：服务端使用已保存关键词与当前选择构造快照，拒绝伪造原词、出处与解释。direct只向模型提供研究原词及已保存修正，模型自行择词，不混入人工补词；manual仅提供当前keyword_ids，即使历史补词仍保存，也不绕过选择。多个词可分别成题，不要求每题使用全部所选词。关键词含`kind:original/manual`与`correction`，原词保留meaning/source_id/quote/stance/speaker/concepts；人工词为独立U前缀ID，`verified:false,source_id:null,quote:null`，不会成为已核实事件事实。模型输入的meaning采用当前correction或原meaning，另保留original_meaning。轮次快照保留原meaning和correction，后续修改不回写旧候选。
+
+修正、补词和选择存于`workbench-data/keyword_edits/:researchId.json`，不改研究文件。推荐任务独立存于`workbench-data/recommendation_tasks/:taskId.json`，包含id/kind/research_id/hotspot_id/operation_id/mode/keyword_snapshot/status/stage/result/error/created_at/finished_at/budget/reuse/mock:false。status为running/completed/failed/blocked。result含id/task_id/research_id/mode/keyword_snapshot/input_hash/candidates/empty_reason/validation_scope/human_review，候选沿用已确认的`id/title/opening/knowledge_question/used_keyword_ids/association_reason/visual_direction/verification_points`；visual_direction为文本数组，verification_points为非空文本数组。
+
+复用原Runner的3072输出上限、核价、账号检查、共享5元账本、预留和OS锁；不重新搜索、取正文或研究，也不另建预算。最多三题；零题必须有非空理由。校验候选字段、唯一ID、所用词范围、标题/开场原词以及画面/待查证文本，`validation_scope=structure_and_keyword_references,human_review=pending`，不表示事件或科学内容通过核验。待确认pending推荐会阻止同热点推荐重发，失败保留费用记录，无隐式重试。
+
+同一research与operation_id重放原任务，包含失败与当时快照；mode不同409。关键词后续修改不改变该操作的语义，新意图必须使用新operation_id。每次新的显式推荐都会调用模型，payload携带operation_id以避免把旧模型缓存冒充新生成；所有旧任务保留。失败时result=null，error为BUDGET_BLOCKED（付费保护受阻）/RECOMMENDATION_STOPPED（模型或输出校验失败）/MODEL_FAILED（其他失败），不暴露外部异常详情。请求中断后可重新打开热点只读查看，不自动续跑。
+
+当前页面展示最近一次成功结果（包括零候选）和最新操作错误，失败不会清除已有候选。展示完整候选、材料引用链接、人工词未核实身份与解释快照，并提示人工检查原物件/数字辨识度、独立知识问题和待查证事项。未保存的修正或补词会阻止推荐并提示保存。刷新重开可恢复；历史切换、换批去重和草稿编辑选用仍由09、10接入。受控验收仅证明流程与保护逻辑，正式模型的选题语义和科学质量需后续真实审核。

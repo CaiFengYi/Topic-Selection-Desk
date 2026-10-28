@@ -36,13 +36,30 @@ class Handler(SimpleHTTPRequestHandler):
         path = urlsplit(self.path).path
         try:
             body = None
-            if method in ("POST", "PATCH"):
+            if method in ("POST", "PATCH", "PUT"):
                 length = int(self.headers.get("Content-Length", "0"))
                 if not 0 < length <= 100000 or self.headers.get_content_type() != "application/json":
                     raise ValueError("请提交不超过100KB的JSON对象")
                 body = json.loads(self.rfile.read(length))
             service = self.server.workbench
-            if path == "/api/hotlist" and method == "GET":
+            parts = path.strip("/").split("/")
+            if len(parts) >= 4 and parts[:2] == ["api", "research"]:
+                from . import recommendation
+                research_id, action = parts[2:4]
+                if len(parts) == 4 and action == "keywords" and method == "GET":
+                    self.respond(recommendation.get_keywords(service, research_id))
+                elif len(parts) == 4 and action == "keywords" and method == "POST":
+                    self.respond(recommendation.edit(service, research_id, "manual", body))
+                elif len(parts) == 5 and action == "keywords" and method == "PATCH":
+                    self.respond(recommendation.edit(service, research_id, "correction", body, parts[4]))
+                elif len(parts) == 4 and action == "selection" and method == "PUT":
+                    self.respond(recommendation.edit(service, research_id, "selection", body))
+                elif len(parts) == 4 and action == "recommendations" and method in ("GET", "POST"):
+                    self.respond(recommendation.saved_tasks(service, research_id) if method == "GET" else
+                                 recommendation.start(service, research_id, body))
+                else:
+                    raise FileNotFoundError()
+            elif path == "/api/hotlist" and method == "GET":
                 self.respond(service.hotlist())
             elif path == "/api/hotlist/refresh" and method == "POST":
                 if body != {}:
@@ -60,7 +77,12 @@ class Handler(SimpleHTTPRequestHandler):
                 self.respond(saved_tasks(service, path.split("/")[3]))
             elif path.startswith("/api/tasks/") and len(path.split("/")) == 4 and method == "GET":
                 from .research import get_task
-                self.respond(get_task(service, path.split("/")[3]))
+                try:
+                    task = get_task(service, path.split("/")[3])
+                except FileNotFoundError:
+                    from .recommendation import get_task as get_recommendation
+                    task = get_recommendation(service, path.split("/")[3])
+                self.respond(task)
             elif path.startswith("/api/tasks/") and len(path.split("/")) == 5 and path.endswith("/event") and method == "PATCH":
                 from .research import select_event
                 self.respond(select_event(service, path.split("/")[3], body))
@@ -96,6 +118,9 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_PATCH(self):
         self.api("PATCH")
+
+    def do_PUT(self):
+        self.api("PUT")
 
 
 def main():

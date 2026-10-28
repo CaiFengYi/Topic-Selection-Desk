@@ -1,5 +1,6 @@
 import { escapeHtml as esc, hotspotView, noticeView } from './views.js';
 import { researchTasksView } from './research.js';
+import { mountLiveRecommendation } from './live-recommendation.js';
 
 const $ = (selector) => document.querySelector(selector);
 document.documentElement.classList.add('live-mode');
@@ -19,7 +20,7 @@ async function api(path, method = 'GET', body) {
   return result;
 }
 
-$('.mode').textContent = '本地模式 · 研究提词';
+$('.mode').textContent = '本地模式 · 研究与推荐';
 $('.discovery-heading .badge').textContent = '本地榜单';
 $('.sidebar-note p').textContent = '榜单仅供定位热点，不合并相似标题或来源说法。采集时间不是事件时间。';
 $('.demo-controls').hidden = true;
@@ -124,6 +125,16 @@ async function loadMaterials(id) {
       $('#research-results')?.remove();
       $('#materials-results').insertAdjacentHTML('beforebegin', researchTasksView(research.tasks));
       if (research.tasks.length) $('#output-state').textContent = '已保存 · 研究记录';
+      for (const task of research.tasks.filter((t) => t.research_completed && t.result)) {
+        if (savedId !== id) break;
+        const root = document.querySelector(`[data-live-recommendation="${task.id}"]`);
+        await mountLiveRecommendation(root, task.result, { api, setBusy(value) {
+          saving = value;
+          document.querySelectorAll('[data-live-recommendation]').forEach((section) => { if (section !== root) section.inert = value; });
+          form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = value; });
+          $('#result').querySelectorAll('[data-task-event], [data-add-clue]').forEach((b) => { b.disabled = value; });
+        } });
+      }
     }
   } catch (error) { $('#status').textContent = `材料读取失败：${error.message}；未自动重试。`; }
 }
