@@ -5,7 +5,7 @@ import json
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from research_validation.core import ValidationError
 
@@ -59,6 +59,9 @@ class Handler(SimpleHTTPRequestHandler):
                                  recommendation.start(service, research_id, body))
                 else:
                     raise FileNotFoundError()
+            elif len(parts) == 5 and parts[:2] == ["api", "rounds"] and parts[3] == "drafts" and method == "PATCH":
+                from .recommendation import edit_draft
+                self.respond(edit_draft(service, parts[2], unquote(parts[4]), body))
             elif path == "/api/hotlist" and method == "GET":
                 self.respond(service.hotlist())
             elif path == "/api/hotlist/refresh" and method == "POST":

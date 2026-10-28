@@ -267,12 +267,55 @@ class RecommendationTests(unittest.TestCase):
             self.assertEqual(request('GET', '/api/tasks/' + task['id'])[1]['result'], task['result'])
             self.assertEqual(request('POST', base + '/recommendations', body)[1]['reuse'], 'operation')
             self.assertEqual(request('GET', base + '/recommendations')[1]['tasks'][0]['id'], task['id'])
+            draft_path = f"/api/rounds/{task['id']}/drafts/T1"
+            self.assertEqual(request('PATCH', draft_path, {'status': 'selected'}, 'https://evil.example')[0], 403)
+            self.assertEqual(request('PATCH', draft_path, {'title': '人工标题', 'opening': '人工开场', 'status': 'selected'})[0], 200)
+            self.assertEqual(request('GET', '/api/tasks/' + task['id'])[1]['result']['candidates'][0]['draft']['title'], '人工标题')
+            self.assertEqual(request('PATCH', draft_path, {'status': 'invalid'})[0], 400)
+            self.assertEqual(request('PATCH', draft_path + '-missing', {'status': 'selected'})[0], 404)
             self.assertEqual(self.model.call_count, 1)
             self.search.assert_not_called()
         finally:
             server.shutdown()
             server.server_close()
             worker.join()
+
+    def test_drafts_independent_across_candidates_rounds_and_restart_without_paid_calls(self):
+        self.model.return_value = self.response(topics(('K1', 'K1'), ('1612N', '1612N')))
+        first, second = self.start(), self.start()
+        self.model.reset_mock()
+        self.account.reset_mock()
+        ledger = (self.output / 'ledger.json').read_bytes()
+        source = rec.task_path(self.service, first['id']).read_bytes()
+        rec.edit_draft(self.service, first['id'], 'T1', {'title': '人工标题', 'opening': '人工开场'})
+        for cid in ('T1', 'T2'):
+            rec.edit_draft(self.service, first['id'], cid, {'status': 'selected'})
+        reopened = Workbench(self.service.data_dir)
+        candidates = rec.get_task(reopened, first['id'])['result']['candidates']
+        self.assertEqual([c['draft']['status'] for c in candidates], ['selected', 'selected'])
+        self.assertEqual(candidates[0]['draft']['title'], '人工标题')
+        self.assertEqual(candidates[0]['draft']['opening'], '人工开场')
+        rec.edit_draft(reopened, first['id'], 'T1', {'status': 'discarded'})
+        candidates = rec.saved_tasks(reopened, self.rid)['tasks'][0]['result']['candidates']
+        self.assertEqual([c['draft']['status'] for c in candidates], ['discarded', 'selected'])
+        self.assertEqual(candidates[0]['draft']['title'], '人工标题')
+        self.assertEqual(rec.get_task(reopened, second['id'])['result']['candidates'][0]['draft']['status'], 'pending')
+        self.assertEqual(rec.task_path(self.service, first['id']).read_bytes(), source)
+        self.assertEqual((self.output / 'ledger.json').read_bytes(), ledger)
+        self.model.assert_not_called()
+        self.account.assert_not_called()
+        self.search.assert_not_called()
+
+    def test_invalid_draft_edits_preserve_saved_content(self):
+        task = self.start()
+        draft = rec.edit_draft(self.service, task['id'], 'T1', {'status': 'selected'})
+        for body in ({}, {'title': ''}, {'opening': ' '}, {'title': 'x' * 201},
+                     {'opening': 'x' * 2001}, {'status': []}, {'title': 42}, {'selected': True}):
+            with self.assertRaises(ValueError):
+                rec.edit_draft(self.service, task['id'], 'T1', body)
+        with self.assertRaises(FileNotFoundError):
+            rec.edit_draft(self.service, task['id'], 'missing', {'status': 'selected'})
+        self.assertEqual(rec.get_task(self.service, task['id'])['result']['candidates'][0]['draft'], draft)
 
 
 if __name__ == '__main__':

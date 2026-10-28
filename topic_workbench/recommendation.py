@@ -69,13 +69,50 @@ def get_task(workbench, task_id):
     task = read_json(task_path(workbench, task_id))
     if task is None:
         raise FileNotFoundError("推荐任务不存在")
+    return with_drafts(workbench, task)
+
+
+def with_drafts(workbench, task):
+    if task["result"]:
+        edits = read_json(workbench.data_dir / "draft_edits" / f"{task['id']}.json", {})
+        for candidate in task["result"]["candidates"]:
+            candidate["draft"] = {"round_id": task["id"], "draft_id": candidate["id"],
+                                  "title": candidate["title"], "opening": candidate["opening"],
+                                  "status": "pending", "updated_at": None, **edits.get(candidate["id"], {})}
     return task
+
+
+def edit_draft(workbench, round_id, draft_id, body):
+    if (not isinstance(body, dict) or not body or set(body) - {"title", "opening", "status"}):
+        raise ValueError("草稿字段无效")
+    changes = {}
+    for field, maximum in (("title", 200), ("opening", 2000)):
+        if field in body:
+            value = body[field]
+            if not isinstance(value, str) or not value.strip() or len(value) > maximum:
+                raise ValueError("草稿标题或开场格式、长度不正确")
+            changes[field] = value.strip()
+    if "status" in body:
+        if body["status"] not in ("pending", "selected", "discarded"):
+            raise ValueError("草稿审核状态无效")
+        changes["status"] = body["status"]
+    with workbench.store_lock:
+        task = get_task(workbench, round_id)
+        candidate = next((c for c in task["result"]["candidates"] if c["id"] == draft_id), None) if task["result"] else None
+        if candidate is None:
+            raise FileNotFoundError("草稿不存在")
+        path = workbench.data_dir / "draft_edits" / f"{round_id}.json"
+        edits = read_json(path, {})
+        draft = {**candidate["draft"], **changes, "updated_at": now()}
+        edits[draft_id] = draft
+        write_json(path, edits)
+        return draft
 
 
 def saved_tasks(workbench, research_id):
     research.get_task(workbench, research_id)
     tasks = [read_json(p) for p in (workbench.data_dir / "recommendation_tasks").glob("*.json")]
-    return {"tasks": sorted((t for t in tasks if t["research_id"] == research_id), key=lambda t: t["created_at"])}
+    return {"tasks": sorted((with_drafts(workbench, t) for t in tasks if t["research_id"] == research_id), key=lambda t: t["created_at"])}
 
 
 def start(workbench, research_id, body):
@@ -158,4 +195,4 @@ def start(workbench, research_id, body):
         task["budget"] = {"accounted_cny": ledger.total, "cap_cny": ledger.cap}
         task["finished_at"] = now()
         write_json(path, task)
-        return task
+        return with_drafts(workbench, task)
