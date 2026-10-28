@@ -73,6 +73,21 @@ class WorkbenchTests(unittest.TestCase):
         self.fetcher.failed = ['bilibili-hot-search', 'douyin', 'weibo']
         self.assertEqual(self.service.refresh()['items'], [])
 
+    def test_failed_collection_is_reported_after_refresh_and_reload(self):
+        self.fetcher.failed = ['bilibili-hot-search', 'douyin', 'weibo']
+        data = self.service.refresh()
+        self.assertIn('采集失败', data['message'])
+        self.assertIn('网络或代理', data['message'])
+        self.assertEqual(Workbench(self.service.data_dir, self.service.news_dir).hotlist()['message'], data['message'])
+        self.assertEqual(len(self.fetcher.calls), 3)
+
+    def test_partial_collection_warns_without_hiding_successful_platforms(self):
+        self.fetcher.failed = ['weibo']
+        data = self.service.refresh()
+        self.assertEqual(len(data['items']), 2)
+        self.assertIn('微博', data['message'])
+        self.assertIn('采集失败', data['message'])
+
     def test_legacy_minute_crawl_time_and_unknown_source_time(self):
         self.service.refresh()
         db = self.service.news_dir / f'{now().date().isoformat()}.db'

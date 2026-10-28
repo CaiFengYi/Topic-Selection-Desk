@@ -13,6 +13,12 @@ Status: completed
 
 ## Comments
 
+2026-10-28验收缺陷修复：用户报告“刷新榜单 · 仅采集”失败。读取当日持久化记录并再次请求原服务，均复现三平台failed/0条；同一采集器在受限环境的HTTP(S)_PROXY指向不可用127.0.0.1:9，报ProxyError/WinError10061。正常主机网络使用本机有效代理，以原URL、原请求头和域名校验取得三平台各30条。已核对并停止原8765选题台进程，在正常网络环境重启同端口服务；未改采集源、代理系统设置、域名校验或重试次数。曾用不同查询参数拼接方式探测得到HTTP403，不能代表生产原URL不可用；最终以原采集器及真实页面刷新验证恢复。
+
+另修复错误反馈缺陷：原接口把全部失败表述为“暂无当前榜单”，部分失败则只说普通采集完成；现在message明确列出失败平台、提示检查服务网络或代理，部分成功时说明其余平台为本次结果。读取持久化失败记录后仍显示同一提示，不把历史数据冒充当前数据。新增两项测试先失败后通过，完整75项后端测试通过；6组Chromium/Playwright页面检查通过，Browser plugin not available。覆盖真实页面刷新90条、重载、原有热点ID保留、1440/390/320布局、外部失败夹具提示、无自动重试及无付费POST；无控制台错误。截图复核通过。测试过程中与用户操作并行，未修改或回滚用户热点或账本；浏览器诊断脚本自身前后费用账本哈希一致，不把之后的用户研究计为诊断调用。
+
+本次证据：[75项后端日志](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17d23-307a-74a3-a9a8-2c1db92ad246/hotlist-diagnosis-tests.log)、[6组页面结果](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17d23-307a-74a3-a9a8-2c1db92ad246/hotlist-fix-qa.json)、[可重跑浏览器脚本](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17d23-307a-74a3-a9a8-2c1db92ad246/hotlist-fix-qa.cjs)、[真实刷新响应](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17d23-307a-74a3-a9a8-2c1db92ad246/hotlist-fixed-response.json)、[恢复截图](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17d23-307a-74a3-a9a8-2c1db92ad246/hotlist-fixed-desktop.png)、[失败提示截图](C:/Users/CaiFY/.codex/visualizations/2026/10/27/01a17d23-307a-74a3-a9a8-2c1db92ad246/hotlist-failure-message.png)。未提交Git。
+
 2026-10-27：用户回复“可以”，认可任务拆分与阻塞关系。本任务已发布，尚未开始实现；任务状态不代表阻塞条件已解除。
 
 2026-10-27：用户要求“/goal 执行ticket05直至完成”。已确认04实际交付获认可，前置阻塞解除；本票实现并通过下述验收，Status改为completed，06前置阻塞解除。未实施06至12。用户随后要求“提交”，授权提交本票实现与验收记录。

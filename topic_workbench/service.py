@@ -93,8 +93,14 @@ class Workbench:
         if not platforms:
             platforms = [{"id": key, "platform": label, "status": "missing", "collected_at": None,
                           "source_status": None, "source_updated_at": None} for key, (label, _) in PLATFORMS.items()]
+        message = "本地当日最近一次采集；不代表实时榜单。" if items else "暂无当前榜单，请刷新采集或手动添加热点。历史示例不会作为当前榜单。"
+        failed = [source["platform"] for source in platforms if source["status"] == "failed"]
+        if failed:
+            message = f"{'、'.join(failed)}榜单采集失败，请检查本地服务的网络或代理以及采集源可用性；未自动重试。"
+            if items:
+                message += "其余平台展示本次已取得的榜单。"
         return {"date": date, "items": items, "platforms": platforms, "mock": False,
-                "message": "本地当日最近一次采集；不代表实时榜单。" if items else "暂无当前榜单，请刷新采集或手动添加热点。历史示例不会作为当前榜单。"}
+                "message": message}
 
     def refresh(self):
         if not self.refresh_lock.acquire(blocking=False):
