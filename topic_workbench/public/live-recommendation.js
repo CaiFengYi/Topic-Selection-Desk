@@ -43,8 +43,8 @@ export async function mountLiveRecommendation(root, research, { api, setBusy }) 
     const chosen = rounds.flatMap((t, i) => t.result.candidates.filter((c) => draftValue(c, t.result).status === 'selected').map((c) => ({ task: t, candidate: c, number: i + 1 })));
     root.querySelector('[data-recommendation-results]').innerHTML = `
       ${latest?.error ? noticeView(latest.error.message, 'error') : ''}
-      ${latest?.status === 'running' ? noticeView('推荐尚未完成，可能执行中或已中断；不会自动重试。') : ''}
-      ${latest?.budget ? `<p class="field-description">本阶段共享计账 / 预留 ${esc(latest.budget.accounted_cny)} / ${esc(latest.budget.cap_cny)} 元；应用估算，不是账户账单。</p>` : ''}
+      ${tasks.some((t) => t.status === 'running') ? noticeView('推荐尚未完成，可能执行中或已中断；不会自动重试。') : ''}
+      ${latest?.budget ? `<p class="field-description">本阶段共享计账（含预留）${esc(latest.budget.accounted_cny)} / 上限 ${esc(latest.budget.cap_cny)} 元；阶段快照，应用估算，不是账户账单。</p>` : ''}
       <details class="selected-drafts"><summary>本次研究已选用 ${chosen.length} 题 · 可多选</summary><ul>${chosen.map(({ task, candidate, number }) => `<li><button class="text-button" type="button" data-round="${esc(task.id)}">第 ${number} 轮 · ${esc(draftValue(candidate, task.result).title)}</button></li>`).join('')}</ul></details>
       ${result ? `<nav class="round-history" aria-label="历史推荐轮次">${rounds.map((t, i) => `<button class="secondary" type="button" data-round="${esc(t.id)}" aria-pressed="${t.id === activeId}">第 ${i + 1} 轮 · ${t.mode === 'direct' ? '直接' : '人工'} · ${t.result.candidates.length} 题</button>`).join('')}</nav>
         <div class="round-actions"><button class="secondary" type="button" data-next-batch data-recommend="${esc(result.mode)}">换一批 · 消耗模型额度</button>

@@ -67,6 +67,12 @@ def start(workbench, hotspot_id, body):
             return task
         if acquired["error"]:
             task["warnings"] = [*task["warnings"], acquired["error"]["message"]]
+            ledger = Ledger(materials.OUTPUT / "ledger.json")
+            if any(e["case"] == f"workbench-{hotspot_id}" and e["status"] in ("failed", "pending")
+                   and e["operation"] in ("search", "contents") for e in ledger.data["entries"]):
+                # Manual text must not bypass a stopped paid acquisition.
+                write_json(path, task)
+                return task
         return run(workbench, task)
 
 

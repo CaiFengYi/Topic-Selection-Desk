@@ -6,6 +6,16 @@ from research_validation.cli import OUTPUT, Runner
 from research_validation.core import Ledger, RunLock, ValidationError, digest, now, read_json, write_json
 
 
+def budget_summary():
+    ledger = Ledger(OUTPUT / "ledger.json")
+    entries = ledger.data["entries"]
+    return {"accounted_cny": ledger.total, "cap_cny": ledger.cap,
+            "uncertain_cny": round(sum(e["accounted_cny"] for e in entries
+                                       if e["cost_basis"] == "reservation"), 8),
+            "pending_count": sum(e["status"] == "pending" for e in entries),
+            "pricing_overrun": bool(ledger.data.get("pricing_overrun"))}
+
+
 def saved_tasks(workbench, hotspot_id):
     workbench.get_hotspot(hotspot_id)
     tasks = [read_json(path) for path in (workbench.data_dir / "tasks").glob("*.json")]

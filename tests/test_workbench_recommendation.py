@@ -256,6 +256,8 @@ class RecommendationTests(unittest.TestCase):
 
         try:
             base = f'/api/research/{self.rid}'
+            self.assertEqual(request('GET', '/api/budget')[1]['cap_cny'], 5)
+            self.assertEqual(request('GET', '/api/budget', origin='https://evil.example')[0], 403)
             self.assertEqual(request('PATCH', base + '/keywords/K1', {'correction': '修正'})[0], 200)
             self.assertEqual(request('PUT', base + '/selection', {'keyword_ids': ['K1']})[0], 200)
             self.assertEqual(request('PUT', base + '/selection', {'keyword_ids': []}, 'https://evil.example')[0], 403)
@@ -316,6 +318,60 @@ class RecommendationTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             rec.edit_draft(self.service, task['id'], 'missing', {'status': 'selected'})
         self.assertEqual(rec.get_task(self.service, task['id'])['result']['candidates'][0]['draft'], draft)
+
+    def test_current_budget_is_read_only_and_distinguishes_uncertain_reservations(self):
+        self.assertEqual(rec.materials.budget_summary()['accounted_cny'], 0)
+        self.assertFalse((self.output / 'ledger.json').exists())
+        ledger = Ledger(self.output / 'ledger.json')
+        ledger.finish(ledger.reserve('terminal', 'research', 0.2), 0.1, cost_basis='peak_rate_usage_estimate')
+        ledger.finish(ledger.reserve('terminal', 'recommend', 0.3), status='failed')
+        ledger.reserve('workbench-' + self.hotspot['id'], 'recommend', 0.4)
+        before = ledger.path.read_bytes()
+        self.assertEqual(rec.materials.budget_summary(), {
+            'accounted_cny': 0.8, 'cap_cny': 5.0, 'uncertain_cny': 0.7,
+            'pending_count': 1, 'pricing_overrun': False})
+        self.assertEqual(ledger.path.read_bytes(), before)
+        self.model.assert_not_called()
+        self.account.assert_not_called()
+        self.search.assert_not_called()
+
+    def test_interrupted_recommendation_preserves_rounds_drafts_and_pending_after_reopen(self):
+        first = self.start()
+        draft = rec.edit_draft(self.service, first['id'], 'T1', {'title': '已保存标题', 'status': 'selected'})
+        body = {'operation_id': str(uuid.uuid4()), 'mode': 'direct'}
+        self.model.side_effect = SystemExit('simulated process interruption')
+        with self.assertRaises(SystemExit):
+            self.start(body=body)
+        before = (self.output / 'ledger.json').read_bytes()
+        self.service = Workbench(self.service.data_dir)
+        history = rec.saved_tasks(self.service, self.rid)['tasks']
+        self.assertEqual(history[0]['result']['candidates'][0]['draft'], draft)
+        self.assertEqual(history[-1]['status'], 'running')
+        self.assertEqual(self.start(body=body)['status'], 'running')
+        self.assertEqual(self.start()['status'], 'blocked')
+        self.assertEqual((self.output / 'ledger.json').read_bytes(), before)
+        self.assertEqual(rec.materials.budget_summary()['pending_count'], 1)
+        self.assertEqual(self.model.call_count, 2)
+        self.search.assert_not_called()
+
+    def test_account_http_errors_and_model_timeout_keep_real_history_without_retries(self):
+        import requests
+        first = self.start()
+        for status in (401, 402, 429):
+            with self.subTest(status=status):
+                self.account.return_value = Mock(status_code=status)
+                self.assertEqual(self.start()['status'], 'blocked')
+                self.assertEqual(self.model.call_count, 1)
+        self.account.return_value = Mock(status_code=200, json=lambda: {'is_available': True})
+        self.model.side_effect = requests.Timeout('test-private')
+        body = {'operation_id': str(uuid.uuid4()), 'mode': 'direct'}
+        failed = self.start(body=body)
+        self.assertEqual(failed['status'], 'failed')
+        self.assertEqual(self.start(body=body)['id'], failed['id'])
+        self.assertEqual(self.model.call_count, 2)
+        self.assertEqual(rec.get_task(self.service, first['id']), first)
+        self.assertNotIn('test-private', json.dumps(rec.saved_tasks(self.service, self.rid)))
+        self.assertNotIn('test-private', ''.join(p.read_text(encoding='utf-8') for p in self.root.rglob('*.json')))
 
 
 if __name__ == '__main__':

@@ -8,7 +8,8 @@ export function researchTasksView(tasks) {
     return `<article class="research-card" data-research-task="${esc(task.id)}">
       <h3>研究卡 · ${esc(task.input_snapshot.title)}</h3>
       <p>${esc(task.stage)} · ${task.research_completed ? '研究提词已完成，等待推荐操作' : '研究提词未完成'}</p>
-      <p class="field-description">本阶段结束：${esc(task.finished_at || '尚未结束，可能执行中或已中断；不会自动续跑')} · ${task.budget ? `共享计账/预留 ${esc(task.budget.accounted_cny)} / ${esc(task.budget.cap_cny)} 元（阶段快照）` : '暂无结束时预算快照'}</p>
+      ${task.status === 'running' ? noticeView('研究尚未完成，可能仍在执行或已中断；已有材料与费用预留保留，不会自动续跑。') : ''}
+      <p class="field-description">本阶段结束：${esc(task.status === 'running' ? '尚未结束，可能执行中或已中断；不会自动续跑' : task.finished_at || '尚未结束')} · ${task.budget ? `共享计账（含预留）${esc(task.budget.accounted_cny)} / 上限 ${esc(task.budget.cap_cny)} 元（阶段快照）` : '暂无结束时预算快照'}</p>
       ${noticeView('有出处不代表事实已核实。材料链分组不裁定真假；研究后不会自动推荐。', 'neutral')}
       ${task.error ? noticeView(task.error.message, 'error') : ''}
       ${task.warnings.map((w) => noticeView(w)).join('')}

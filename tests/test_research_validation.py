@@ -305,6 +305,29 @@ class ValidationTests(unittest.TestCase):
             self.assertEqual(send.call_count, 1)
             self.assertEqual(len(runner.ledger.data["entries"]), 1)
 
+    def test_model_sdk_auth_balance_rate_limit_and_timeout_send_once(self):
+        import httpx
+        secret = 'ticket11-sdk-private-key'
+        config = {"model": "deepseek/deepseek-v4-flash", "api_key": secret, "api_base": "https://api.deepseek.com"}
+        request = httpx.Request('POST', 'https://api.deepseek.com/chat/completions')
+        for status in (401, 402, 429, 'timeout'):
+            with self.subTest(status=status):
+                result = (httpx.ReadTimeout(secret, request=request) if status == 'timeout' else
+                          httpx.Response(status, json={'error': {'message': secret, 'type': 'api_error'}}, request=request))
+                with patch('research_validation.cli.model_config', return_value=config), \
+                     patch.dict(os.environ, {'AI_API_KEY': secret, 'EXA_API_KEY': secret}), \
+                     patch.object(Runner, 'check_accounts'), patch('httpx.Client.send') as send:
+                    if isinstance(result, Exception):
+                        send.side_effect = result
+                    else:
+                        send.return_value = result
+                    runner = Runner(self.path)
+                    with self.assertRaises(ValidationError):
+                        runner.model_call(str(status), 'recommend', '输出JSON对象', {}, 100)
+                    self.assertEqual(send.call_count, 1)
+                    self.assertGreater(runner.ledger.total, 0)
+                    self.assertNotIn(secret, ''.join(p.read_text(encoding='utf-8') for p in self.path.rglob('*.json')))
+
 
 if __name__ == "__main__":
     unittest.main()

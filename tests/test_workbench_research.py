@@ -112,6 +112,25 @@ class ResearchTests(unittest.TestCase):
         self.assertEqual(task['materials'][0]['status'], 'manual')
         self.assertIsNone(task['materials'][0]['read_at'])
 
+    def test_failed_paid_collection_with_manual_text_stops_before_model_and_replays(self):
+        import requests
+        for failure in (401, 402, 429, 'timeout'):
+            with self.subTest(failure=failure):
+                self.record = self.service.save_hotspot({'title': f'失败 {failure}', 'entry_kind': 'manual',
+                    'manual_material': {'text': QUOTE, 'source_description': '人工材料'}})
+                self.body = {'operation_id': str(uuid.uuid4())}
+                self.post.reset_mock()
+                self.post.side_effect = (requests.Timeout('test-private') if failure == 'timeout' else
+                                         [Mock(status_code=failure)])
+                task = self.start()
+                self.assertEqual(task['status'], 'failed')
+                self.assertFalse(task['research_completed'])
+                self.assertEqual(task['materials'][-1]['text'], QUOTE)
+                self.assertEqual(self.start()['id'], task['id'])
+                self.assertEqual(self.post.call_count, 1)
+                self.model.assert_not_called()
+                self.assertNotIn('test-private', json.dumps(task))
+
     def test_invalid_quote_and_candidate_never_publish_result(self):
         for invalid in ('quote', 'candidate'):
             data = output()

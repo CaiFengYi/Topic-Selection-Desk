@@ -27,6 +27,7 @@ $('.demo-controls').hidden = true;
 $('#submit').textContent = '保存热点';
 $('.form-footer p').textContent = '保存不收费。发起研究会取材并调用 DeepSeek 提词，共用累计 5 元上限；完成后等待推荐操作。';
 $('.form-footer').insertAdjacentHTML('beforeend', '<button id="collect" class="secondary" type="submit">发起研究</button>');
+$('.form-footer').insertAdjacentHTML('afterend', '<p id="budget-status" class="field-description" role="status"></p>');
 $('.contract .field-description').innerHTML = '当前为真实本地接口记录。<a href="/?mode=demo">打开已确认的模拟原型</a>（演示结果仅在页面内存中）。';
 $('#contract').textContent = '等待本地接口请求。';
 $('#output-heading').textContent = '热点记录';
@@ -101,13 +102,20 @@ function sourceLink(url) {
   return esc(url || '未提供');
 }
 
+async function loadBudget() {
+  try {
+    const b = await api('/api/budget');
+    $('#budget-status').textContent = `共享累计计账（含预留）${b.accounted_cny} / 上限 ${b.cap_cny} 元，其中不确定费用预留 ${b.uncertain_cny} 元；待确认请求 ${b.pending_count} 个。应用估算，不是账户账单。失败或中断不会释放预留，也不会自动续跑。${b.pricing_overrun ? '价格异常，后续付费请求已拦截。' : ''}`;
+  } catch (error) { $('#budget-status').textContent = `费用记录读取失败：${error.message}；不能据此认定尚有额度，未自动重试。`; }
+}
+
 function showMaterials(tasks) {
   if (tasks.length) $('#output-state').textContent = '已保存 · 取材记录';
   $('#materials-results')?.remove();
   $('#result').insertAdjacentHTML('beforeend', `<section id="materials-results" aria-label="取材记录">${tasks.map((task) => `<article class="research-card">
     <h3>取材阶段 · ${esc(task.input_snapshot.title)}</h3>
     <p>${esc(({ completed: '取材结束', failed: '取材失败', blocked: '取材受阻', running: '尚未完成，可能仍在执行或已中断；不会自动续跑' })[task.status])} · 未完成研究提词</p>
-    <p class="field-description">发起：${esc(formatTime(task.created_at))} · ${task.budget ? `本次结束时共享计账/预留 ${esc(task.budget.accounted_cny)} / ${esc(task.budget.cap_cny)} 元` : '尚无结束时费用快照'}</p>
+    <p class="field-description">发起：${esc(formatTime(task.created_at))} · ${task.budget ? `本次结束时共享计账（含预留）${esc(task.budget.accounted_cny)} / 上限 ${esc(task.budget.cap_cny)} 元` : '尚无结束时费用快照'}</p>
     ${task.error ? noticeView(task.error.message, 'error') : ''}${task.warnings.map((warning) => noticeView(warning)).join('')}
     <p>可读正文 ${task.materials.filter((s) => s.status === 'body').length} · 完全重复 ${task.materials.filter((s) => s.status === 'duplicate').length} · 读取失败 ${task.materials.filter((s) => s.status === 'read_failed').length}</p>
     ${task.materials.map((source) => `<details class="material"><summary><span>${esc(source.id)} · ${esc(source.title)}<br>${esc(({ body: '已读正文 · 未核实', search_summary: '仅搜索结果 · 尚未读正文', duplicate: `完全重复 · 对应 ${source.duplicate_of}`, read_failed: '读取失败 · 未重试' })[source.status])}</span></summary><div class="material-body"><p>来源：${sourceLink(source.url)}</p><p>发布时间：${esc(formatTime(source.published_at))}<br>检索时间：${esc(formatTime(source.searched_at || source.retrieved_at))}<br>读取时间：${esc(formatTime(source.read_at))}</p>${source.error ? noticeView(source.error, 'error') : ''}<p class="material-text">${esc(source.text || '未取得正文')}</p>${source.summary ? `<p>搜索摘要（不是正文）：${esc(source.summary)}</p>` : ''}</div></details>`).join('')}
@@ -130,6 +138,7 @@ async function loadMaterials(id) {
         const root = document.querySelector(`[data-live-recommendation="${task.id}"]`);
         await mountLiveRecommendation(root, task.result, { api, setBusy(value) {
           saving = value;
+          if (!value) loadBudget();
           document.querySelectorAll('[data-live-recommendation]').forEach((section) => { if (section !== root) section.inert = value; });
           form.querySelectorAll('input, textarea, button').forEach((field) => { field.disabled = value; });
           $('#result').querySelectorAll('[data-task-event], [data-add-clue]').forEach((b) => { b.disabled = value; });
@@ -137,6 +146,7 @@ async function loadMaterials(id) {
       }
     }
   } catch (error) { $('#status').textContent = `材料读取失败：${error.message}；未自动重试。`; }
+  finally { await loadBudget(); }
 }
 
 async function collectMaterials() {
@@ -268,3 +278,4 @@ if (matchMedia('(max-width: 640px)').matches) $('#discovery').open = false;
 renderList();
 await loadList();
 await loadSaved();
+await loadBudget();
