@@ -2,6 +2,7 @@ import json
 import os
 import shutil
 import unittest
+from datetime import datetime, timezone
 import uuid
 from unittest.mock import Mock, patch
 
@@ -24,6 +25,8 @@ def output(source='S1'):
 
 class ResearchTests(unittest.TestCase):
     def setUp(self):
+        clock = self.enterContext(patch('research_validation.cli.datetime', wraps=datetime))
+        clock.now.return_value = datetime(2026, 10, 27, tzinfo=timezone.utc)
         self.root = ROOT / 'validation-output/test-tmp' / ('research-' + uuid.uuid4().hex)
         self.output = self.root / 'shared'
         self.service = Workbench(self.root / 'data', self.root / 'news')

@@ -1,5 +1,16 @@
 /.env.local
+/.env
+/.env.*
+!/.env.example
 /.uv-cache/
 /validation-output/
 __pycache__/
 /workbench-data/
+/.venv/
+/.pytest_cache/
+*.py[cod]
+# Local experiments and session notes are not part of the topic desk.
+/video_validation/
+/.scratch/coffee-edit-validation/
+/PROJECT_CONTEXT.md
+/run-trendradar.ps1

@@ -1,0 +1,3 @@
+[submodule "TrendRadar"]
+	path = TrendRadar
+	url = https://github.com/sansan0/TrendRadar.git

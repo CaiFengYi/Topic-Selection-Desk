@@ -3,6 +3,7 @@ import os
 import shutil
 import uuid
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
@@ -37,6 +38,8 @@ def topics():
 
 class ValidationTests(unittest.TestCase):
     def setUp(self):
+        clock = self.enterContext(patch("research_validation.cli.datetime", wraps=datetime))
+        clock.now.return_value = datetime(2026, 10, 27, tzinfo=timezone.utc)
         self.test_root = Path(__file__).resolve().parents[1] / "validation-output" / "test-tmp"
         self.test_root.mkdir(parents=True, exist_ok=True)
         # Python 3.12 mkdtemp's private Windows ACL excludes the sandbox token.
